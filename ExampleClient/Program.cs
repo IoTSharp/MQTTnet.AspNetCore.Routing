@@ -1,8 +1,8 @@
 ﻿using MQTTnet;
-using MQTTnet.Client;
 using MQTTnet.Extensions.ManagedClient;
 using MQTTnet.Packets;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 
 namespace ExampleClient
@@ -12,17 +12,23 @@ namespace ExampleClient
         private static async System.Threading.Tasks.Task Main(string[] args)
         {
             var rnd = new Random();
+
+
             // Setup and start a managed MQTT client.
-            var options = new ManagedMqttClientOptionsBuilder()
-                .WithAutoReconnectDelay(TimeSpan.FromSeconds(5))
-                .WithClientOptions(new MqttClientOptionsBuilder()
-                    .WithClientId($"Client{rnd.Next(0, 1000)}")
-                    .WithWebSocketServer( cfg=> cfg.WithUri("localhost:50482/mqtt"))
-                    .Build())
+            var options = new MqttClientOptionsBuilder()
+                .WithKeepAlivePeriod(TimeSpan.FromSeconds(5))
+                .WithClientId($"Client{rnd.Next(0, 1000)}")
+                .WithTcpServer("localhost")
+                .WithCredentials("user", "password")
                 .Build();
 
-            var mqttClient = new MqttFactory().CreateManagedMqttClient();
-            await mqttClient.SubscribeAsync(new List<MqttTopicFilter> { new MqttTopicFilterBuilder().WithTopic("MqttWeatherForecast/90210/temperature").Build() });
+            var mqttClient = new MqttClientFactory().CreateMqttClient();
+
+            mqttClient.ConnectingAsync += (e) =>
+            {
+                Console.WriteLine($"Connecting...");
+                return System.Threading.Tasks.Task.CompletedTask;
+            };
 
             mqttClient.ConnectedAsync += (e) =>
             {
@@ -30,35 +36,37 @@ namespace ExampleClient
                 return System.Threading.Tasks.Task.CompletedTask;
             };
 
-            mqttClient.ConnectingFailedAsync += (e) =>
-            {
-                Console.WriteLine($"Connection Failed: {e.Exception}");
-                return System.Threading.Tasks.Task.CompletedTask;
-            };
-
             mqttClient.ApplicationMessageReceivedAsync += e =>
             {
-                Console.WriteLine($"Message from {e.ClientId}: {e.ApplicationMessage.PayloadSegment.Count } bytes.");
+                Console.WriteLine($"Message from {e.ClientId}: {e.ApplicationMessage.Payload.Length} bytes.");
                 return System.Threading.Tasks.Task.CompletedTask;
             };
 
-            await mqttClient.StartAsync(options);
+            await mqttClient.ConnectAsync(options);
 
-            // Publish a message on a well known topic
-            await mqttClient.EnqueueAsync(new ManagedMqttApplicationMessageBuilder().WithApplicationMessage(msg =>
+            await mqttClient.SubscribeAsync(new MqttClientSubscribeOptions()
             {
-                msg.WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce);
-                msg.WithPayload(BitConverter.GetBytes(98.6d));
-                msg.WithTopic("MqttWeatherForecast/90210/temperature");
-            }).Build());
+                TopicFilters = new List<MqttTopicFilter> {
+                    new MqttTopicFilter() {
+                        Topic = "MqttWeatherForecast/90210/temperature",
+                        QualityOfServiceLevel = MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce,
+                    }
+                }
+            });
 
-            // Publish a message on a topic the server doesn't explicitly handle
-            await mqttClient.EnqueueAsync(new ManagedMqttApplicationMessageBuilder().WithApplicationMessage(msg =>
+            await mqttClient.PublishAsync(new MqttApplicationMessage()
             {
-                msg.WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce);
-                msg.WithPayload(BitConverter.GetBytes(100d));
-                msg.WithTopic("asdfsdfsadfasdf");
-            }).Build());
+                Topic = "MqttWeatherForecast/90210/temperature",
+                QualityOfServiceLevel = MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce,
+                Payload = new ReadOnlySequence<byte>(BitConverter.GetBytes(98.6d)),
+            });
+
+            await mqttClient.PublishAsync(new MqttApplicationMessage()
+            {
+                Topic = "asdfsdfsadfasdf",
+                QualityOfServiceLevel = MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce,
+                Payload = new ReadOnlySequence<byte>(BitConverter.GetBytes(100d)),
+            });
 
             // StartAsync returns immediately, as it starts a new thread using Task.Run, and so the calling thread needs
             // to wait.
