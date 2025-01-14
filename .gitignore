@@ -341,3 +341,6 @@ healthchecksdb
 
 # VsCode
 .vscode/
+
+# MacOS
+.DS_Store
