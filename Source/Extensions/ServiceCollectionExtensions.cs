@@ -85,6 +85,11 @@ namespace MQTTnet.AspNetCore.Routing
             return opt;
         }
 
+        public static MqttRoutingOptions FromAssemblies(this MqttRoutingOptions opt, params Assembly[] assemblies)
+        {
+            opt.FromAssemblies = assemblies;
+            return opt;
+        }
 
         [Obsolete("Use 'services.AddMqttControllers(opt => opt.SerializerOptions= new JsonSerializerOptions());' instead ")]
         public static IServiceCollection AddMqttDefaultJsonOptions(this IServiceCollection services,
