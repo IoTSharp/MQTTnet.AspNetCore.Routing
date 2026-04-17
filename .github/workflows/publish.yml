@@ -1,0 +1,54 @@
+name: Publish
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln"
+
+      - name: Build
+        run: dotnet build "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln" --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln" --configuration Release --no-build
+
+      - name: Pack
+        run: dotnet pack "${{ github.workspace }}/Source/MQTTnet.AspNetCore.Routing.csproj" --configuration Release --no-build --output "${{ github.workspace }}/artifacts"
+
+      - name: Publish to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push "${{ github.workspace }}/artifacts/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet nuget push "${{ github.workspace }}/artifacts/*.snupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Publish to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet nuget push "${{ github.workspace }}/artifacts/*.nupkg" --api-key "$GITHUB_TOKEN" --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json --skip-duplicate

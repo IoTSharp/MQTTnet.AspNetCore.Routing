@@ -21,11 +21,12 @@
 		<Version>0.4.0</Version>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 		<PackageProjectUrl>https://github.com/IoTSharp/MQTTnet.AspNetCore.Routing</PackageProjectUrl>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<IncludeSymbols>true</IncludeSymbols>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 		<EnableNETAnalyzers>true</EnableNETAnalyzers>
-		<TargetFrameworks>net9.0;net8.0</TargetFrameworks>
+		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
  
 	</PropertyGroup>
 	<ItemGroup>
@@ -36,7 +37,11 @@
 
 
 	<ItemGroup>
-		<PackageReference Include="MQTTnet" Version="5.0.1.1416" />
-		<PackageReference Include="MQTTnet.AspNetCore" Version="5.0.1.1416" />
+		<PackageReference Include="MQTTnet" Version="5.1.*" />
+		<PackageReference Include="MQTTnet.AspNetCore" Version="5.1.*" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
 	</ItemGroup>
 </Project>

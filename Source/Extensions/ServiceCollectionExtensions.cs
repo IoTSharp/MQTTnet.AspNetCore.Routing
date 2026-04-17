@@ -13,6 +13,8 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
 
+#nullable enable
+
 // This is needed to make internal classes visible to UnitTesting projects
 [assembly: InternalsVisibleTo("MQTTnet.AspNetCore.Routing.Tests, PublicKey=00240000048000009" +
     "4000000060200000024000052534131000400000100010089369e254b2bf47119265eb7514c522350b2e61beda20ccc9" +
@@ -49,7 +51,7 @@ namespace MQTTnet.AspNetCore.Routing
                 {
                     throw new ArgumentException("'fromAssemblies' cannot be an empty array. Pass null or a collection of 1 or more assemblies.", nameof(fromAssemblies));
                 }
-                var assemblies = fromAssemblies ?? new Assembly[] { Assembly.GetEntryAssembly() };
+                var assemblies = fromAssemblies ?? new[] { Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly() };
 
                 return MqttRouteTableFactory.Create(assemblies);
             });
@@ -119,7 +121,7 @@ namespace MQTTnet.AspNetCore.Routing
 
             publishEventProvider.OnPublishAsync += async (args) =>
             {
-                object correlationObject = null;
+                object? correlationObject = null;
                 if (interceptor != null)
                 {
                     correlationObject = await interceptor.RouteExecuting(args);
