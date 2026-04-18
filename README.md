@@ -1,6 +1,9 @@
-﻿[![NuGet Badge](https://buildstats.info/nuget/MQTTnet.AspNetCore.Routing)](https://www.nuget.org/packages/MQTTnet.AspNetCore.Routing)
+﻿![NuGet Version](https://img.shields.io/nuget/v/MQTTnet.AspNetCore.Routing?label=MQTTnet.AspNetCore.Routing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://github.com/IoTSharp/MQTTnet.AspNetCore.Routing/LICENSE)
 [![CI](https://github.com/IoTSharp/MQTTnet.AspNetCore.Routing/actions/workflows/ci.yml/badge.svg)](https://github.com/IoTSharp/MQTTnet.AspNetCore.Routing/actions/workflows/ci.yml)
+[![CI](https://github.com/IoTSharp/MQTTnet.AspNetCore.Routing/actions/workflows/publish.yml/badge.svg)](https://github.com/IoTSharp/MQTTnet.AspNetCore.Routing/actions/workflows/publish.yml)
+![NuGet Downloads](https://img.shields.io/nuget/dt/MQTTnet.AspNetCore.Routing)
+
 
 # MQTTnet AspNetCore Routing
 
