@@ -17,8 +17,6 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    env:
-      PACKAGE_VERSION: ${{ github.event.release.tag_name || github.ref_name }}
 
     steps:
       - name: Checkout
@@ -35,8 +33,10 @@ jobs:
         run: dotnet restore "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln"
 
       - name: Resolve package version
+        env:
+          RAW_TAG: ${{ github.event.release.tag_name || github.ref_name }}
         run: |
-          PACKAGE_VERSION="${PACKAGE_VERSION#v}"
+          PACKAGE_VERSION="${RAW_TAG#v}"
           if [ -z "$PACKAGE_VERSION" ]; then
             echo "Package version could not be resolved from the release tag or ref name."
             exit 1
