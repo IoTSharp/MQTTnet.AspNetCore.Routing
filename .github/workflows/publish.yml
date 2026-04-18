@@ -32,14 +32,40 @@ jobs:
       - name: Restore
         run: dotnet restore "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln"
 
+      - name: Resolve package version
+        env:
+          RAW_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          NUGET_VERSION_PATTERN='^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z-]+)*(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+
+          if [ -z "$RAW_TAG" ]; then
+            echo "Release tag or ref name is empty."
+            exit 1
+          fi
+          if [ "$RAW_TAG" = "v" ]; then
+            echo "Release tag 'v' does not contain a version."
+            exit 1
+          fi
+          PACKAGE_VERSION="${RAW_TAG#v}"
+          if [ -z "$PACKAGE_VERSION" ]; then
+            echo "Release tag '$RAW_TAG' does not contain a version after the optional 'v' prefix."
+            exit 1
+          fi
+          # major.minor.patch with optional prerelease/build metadata segments.
+          if ! [[ "$PACKAGE_VERSION" =~ $NUGET_VERSION_PATTERN ]]; then
+            echo "Package version '$PACKAGE_VERSION' derived from '$RAW_TAG' is not a valid NuGet version."
+            exit 1
+          fi
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
+
       - name: Build
-        run: dotnet build "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln" --configuration Release --no-restore
+        run: dotnet build "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln" --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
 
       - name: Test
         run: dotnet test "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln" --configuration Release --no-build
 
       - name: Pack
-        run: dotnet pack "${{ github.workspace }}/Source/MQTTnet.AspNetCore.Routing.csproj" --configuration Release --no-build --output "${{ github.workspace }}/artifacts"
+        run: dotnet pack "${{ github.workspace }}/Source/MQTTnet.AspNetCore.Routing.csproj" --configuration Release --no-build --output "${{ github.workspace }}/artifacts" -p:Version="$PACKAGE_VERSION"
 
       - name: Publish to NuGet.org
         env:
