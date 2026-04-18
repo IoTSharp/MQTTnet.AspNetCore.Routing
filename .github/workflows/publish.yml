@@ -36,11 +36,16 @@ jobs:
         env:
           RAW_TAG: ${{ github.event.release.tag_name || github.ref_name }}
         run: |
-          PACKAGE_VERSION="${RAW_TAG#v}"
-          if [ -z "$PACKAGE_VERSION" ]; then
-            echo "Package version could not be resolved from the release tag or ref name: '$RAW_TAG'."
+          if [ -z "$RAW_TAG" ]; then
+            echo "Release tag or ref name is empty."
             exit 1
           fi
+          PACKAGE_VERSION="${RAW_TAG#v}"
+          if [ -z "$PACKAGE_VERSION" ]; then
+            echo "Release tag '$RAW_TAG' does not contain a version after the optional 'v' prefix."
+            exit 1
+          fi
+          # Accepts 1.0, 1.0.0, 1.0.0.0, and optional prerelease/build metadata segments.
           if ! [[ "$PACKAGE_VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}([.-][0-9A-Za-z-]+)*(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
             echo "Package version '$PACKAGE_VERSION' derived from '$RAW_TAG' is not a valid NuGet version."
             exit 1
