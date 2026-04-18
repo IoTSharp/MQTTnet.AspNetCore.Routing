@@ -102,12 +102,9 @@ namespace MQTTnet.AspNetCore.Routing
                         tmpx.Segments.Where(p => p.IsParameter).ToList().ForEach(ts =>
                         {
                             var pro = declaringType.GetRuntimeProperty(ts.Value);
-                            if (pro != null)
+                            if (pro != null && routeContext.Parameters.TryGetValue(ts.Value, out var pvalue))
                             {
-                                if (routeContext.Parameters.TryGetValue(ts.Value, out object pvalue))
-                                {
-                                    pro.SetValue(classInstance, pvalue);
-                                }
+                                pro.SetValue(classInstance, pvalue);
                             }
                         });
                     }
@@ -170,13 +167,13 @@ namespace MQTTnet.AspNetCore.Routing
 
                 if (result == null)
                 {
-                    throw new NullReferenceException($"{method.DeclaringType.FullName}.{method.Name} returned null instead of Task");
+                    throw new NullReferenceException($"{method.DeclaringType?.FullName ?? "<unknown>"}.{method.Name} returned null instead of Task");
                 }
 
                 return result;
             }
 
-            throw new InvalidOperationException($"Unsupported Action return type \"{method.ReturnType}\" on method {method.DeclaringType.FullName}.{method.Name}. Only void and {nameof(Task)} are allowed.");
+            throw new InvalidOperationException($"Unsupported Action return type \"{method.ReturnType}\" on method {method.DeclaringType?.FullName ?? "<unknown>"}.{method.Name}. Only void and {nameof(Task)} are allowed.");
         }
 
         private static object? MatchParameterOrThrow(ParameterInfo param,
