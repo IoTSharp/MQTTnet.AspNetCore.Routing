@@ -7,6 +7,7 @@ using MQTTnet.AspNetCore.Routing;
 using MQTTnet.AspNetCore.Routing.Routing;
 using MQTTnet.Server;
 using System;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Encodings.Web;
@@ -28,11 +29,18 @@ namespace MQTTnet.AspNetCore.Routing
         {
             return services.AddMqttControllers(opt => opt.FromAssemblies = fromAssemblies);
         }
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static IServiceCollection AddMqttControllers(this IServiceCollection services)
         {
-            return services.AddMqttControllers(opt => { });
+            return AddMqttControllers(services, opt => { }, GetDefaultAssemblies(Assembly.GetCallingAssembly()));
         }
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static IServiceCollection AddMqttControllers(this IServiceCollection services, Action<MqttRoutingOptions> _options)
+        {
+            return AddMqttControllers(services, _options, GetDefaultAssemblies(Assembly.GetCallingAssembly()));
+        }
+
+        private static IServiceCollection AddMqttControllers(this IServiceCollection services, Action<MqttRoutingOptions> _options, Assembly[] defaultAssemblies)
         {
             var _opt = new MqttRoutingOptions();
             _opt.WithJsonSerializerOptions();
@@ -49,7 +57,7 @@ namespace MQTTnet.AspNetCore.Routing
                 {
                     throw new ArgumentException("'fromAssemblies' cannot be an empty array. Pass null or a collection of 1 or more assemblies.", nameof(fromAssemblies));
                 }
-                var assemblies = fromAssemblies ?? new Assembly[] { Assembly.GetEntryAssembly() };
+                var assemblies = fromAssemblies ?? defaultAssemblies;
 
                 return MqttRouteTableFactory.Create(assemblies);
             });
@@ -62,6 +70,15 @@ namespace MQTTnet.AspNetCore.Routing
             }
             return services;
         }
+
+        private static Assembly[] GetDefaultAssemblies(Assembly callingAssembly)
+        {
+            return new[] { callingAssembly, Assembly.GetEntryAssembly() }
+                .Where(a => a != null)
+                .Distinct()
+                .ToArray();
+        }
+
         public static void WithRouteInvocationInterceptor<T>(this MqttRoutingOptions opt) where T : IRouteInvocationInterceptor
         {
             opt.RouteInvocationInterceptor = typeof(T);
