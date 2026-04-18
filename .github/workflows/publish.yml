@@ -17,6 +17,8 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      PACKAGE_VERSION: ${{ github.event.release.tag_name || github.ref_name }}
 
     steps:
       - name: Checkout
@@ -32,14 +34,23 @@ jobs:
       - name: Restore
         run: dotnet restore "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln"
 
+      - name: Resolve package version
+        run: |
+          PACKAGE_VERSION="${PACKAGE_VERSION#v}"
+          if [ -z "$PACKAGE_VERSION" ]; then
+            echo "Package version could not be resolved from the release tag or ref name."
+            exit 1
+          fi
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
+
       - name: Build
-        run: dotnet build "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln" --configuration Release --no-restore
+        run: dotnet build "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln" --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
 
       - name: Test
         run: dotnet test "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln" --configuration Release --no-build
 
       - name: Pack
-        run: dotnet pack "${{ github.workspace }}/Source/MQTTnet.AspNetCore.Routing.csproj" --configuration Release --no-build --output "${{ github.workspace }}/artifacts"
+        run: dotnet pack "${{ github.workspace }}/Source/MQTTnet.AspNetCore.Routing.csproj" --configuration Release --no-build --output "${{ github.workspace }}/artifacts" -p:Version="$PACKAGE_VERSION"
 
       - name: Publish to NuGet.org
         env:
