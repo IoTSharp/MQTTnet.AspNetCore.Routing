@@ -23,17 +23,17 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                     new RouteTemplate(routes[0], new List<TemplateSegment>() {
                         new TemplateSegment(routes[0], "super", false),
                         new TemplateSegment(routes[0], "awesome", false),
-                    }), null, new string[] { }),
+                    }), null, new string[] { }, typeof(RouteTableTests)),
                 new MqttRoute(
                     new RouteTemplate(routes[1], new List<TemplateSegment>() {
                         new TemplateSegment(routes[1], "super", false),
                         new TemplateSegment(routes[1], "cool", false),
-                    }), null, new string[] { }),
+                    }), null, new string[] { }, typeof(RouteTableTests)),
                 new MqttRoute(
                     new RouteTemplate(routes[2], new List<TemplateSegment>() {
                         new TemplateSegment(routes[2], "other", false),
                         new TemplateSegment(routes[2], "route", false),
-                    }), null, new string[] { }),
+                    }), null, new string[] { }, typeof(RouteTableTests)),
             };
 
             // Act
@@ -61,17 +61,17 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                     new RouteTemplate(routes[0], new List<TemplateSegment>() {
                         new TemplateSegment(routes[0], "super", false),
                         new TemplateSegment(routes[0], "awesome", false),
-                    }), MockMethod, new string[] { }),
+                    }), MockMethod, new string[] { }, typeof(RouteTableTests)),
                 new MqttRoute(
                     new RouteTemplate(routes[1], new List<TemplateSegment>() {
                         new TemplateSegment(routes[1], "super", false),
                         new TemplateSegment(routes[1], "cool", false),
-                    }), MockMethod2, new string[] { }),
+                    }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
                 new MqttRoute(
                     new RouteTemplate(routes[2], new List<TemplateSegment>() {
                         new TemplateSegment(routes[2], "other", false),
                         new TemplateSegment(routes[2], "route", false),
-                    }), MockMethod2, new string[] { }),
+                    }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
             };
             var context = new MqttRouteContext("super/awesome");
 
@@ -104,17 +104,17 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                 new MqttRoute(
                     new RouteTemplate(routes[0], new List<TemplateSegment>() {
                         new TemplateSegment(routes[0], "*path", true),
-                    }), MockMethod, new string[] { }),
+                    }), MockMethod, new string[] { }, typeof(RouteTableTests)),
                 new MqttRoute(
                     new RouteTemplate(routes[1], new List<TemplateSegment>() {
                         new TemplateSegment(routes[1], "super", false),
                         new TemplateSegment(routes[1], "cool", false),
-                    }), MockMethod2, new string[] { }),
+                    }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
                 new MqttRoute(
                     new RouteTemplate(routes[2], new List<TemplateSegment>() {
                         new TemplateSegment(routes[2], "other", false),
                         new TemplateSegment(routes[2], "route", false),
-                    }), MockMethod2, new string[] { }),
+                    }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
             };
 
             var context = new MqttRouteContext("super/duper");
@@ -149,16 +149,16 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                     new RouteTemplate(routes[1], new List<TemplateSegment>() {
                         new TemplateSegment(routes[1], "super", false),
                         new TemplateSegment(routes[1], "cool", false),
-                    }), MockMethod, new string[] { }),
+                    }), MockMethod, new string[] { }, typeof(RouteTableTests)),
                 new MqttRoute(
                     new RouteTemplate(routes[2], new List<TemplateSegment>() {
                         new TemplateSegment(routes[2], "other", false),
                         new TemplateSegment(routes[2], "route", false),
-                    }), MockMethod2, new string[] { }),
+                    }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
                 new MqttRoute(
                     new RouteTemplate(routes[0], new List<TemplateSegment>() {
                         new TemplateSegment(routes[0], "*path", true),
-                    }), MockMethod2, new string[] { }),
+                    }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
             };
 
             var context = new MqttRouteContext("super/cool");
@@ -193,17 +193,17 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                     new RouteTemplate(routes[0], new List<TemplateSegment>() {
                         new TemplateSegment(routes[0], "super", false),
                         new TemplateSegment(routes[0], "awesome", false),
-                    }), MockMethod, new string[] { }),
+                    }), MockMethod, new string[] { }, typeof(RouteTableTests)),
                 new MqttRoute(
                     new RouteTemplate(routes[1], new List<TemplateSegment>() {
                         new TemplateSegment(routes[1], "super", false),
                         new TemplateSegment(routes[1], "cool", false),
-                    }), MockMethod2, new string[] { }),
+                    }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
                 new MqttRoute(
                     new RouteTemplate(routes[2], new List<TemplateSegment>() {
                         new TemplateSegment(routes[2], "other", false),
                         new TemplateSegment(routes[2], "route", false),
-                    }), MockMethod2, new string[] { }),
+                    }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
             };
             var context = new MqttRouteContext("super/miss");
 
