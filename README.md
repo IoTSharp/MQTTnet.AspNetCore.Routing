@@ -56,6 +56,23 @@ For dotnet CLI:
 dotnet add package MQTTnet.AspNetCore.Routing
 ```
 
+### Slim routing for Native AOT
+
+`AddMqttControllers` keeps the original controller-style API. For Native AOT applications, prefer the slim routing API: routes are registered explicitly, no assemblies are scanned, and JSON payloads are deserialized with source-generated `JsonTypeInfo<T>`.
+
+```csharp
+using MQTTnet.AspNetCore.Routing;
+
+builder.Services.AddMqttApplicationMessageSlimRouting(routes =>
+{
+    routes.MapJson("devices/{deviceId}/telemetry", AppJsonContext.Default.Telemetry, static (ctx, payload) =>
+    {
+        var deviceId = ctx.GetRouteValue("deviceId");
+        return ValueTask.CompletedTask;
+    });
+});
+```
+
 Example configuration on ASP.NET Core 6 MVC Configuration
 
 ```csharp

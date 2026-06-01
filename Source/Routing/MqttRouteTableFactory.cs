@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 
@@ -14,6 +15,12 @@ namespace MQTTnet.AspNetCore.Routing
 {
     internal static class MqttRouteTableFactory
     {
+        private const DynamicallyAccessedMemberTypes ControllerMemberTypes =
+            DynamicallyAccessedMemberTypes.PublicConstructors |
+            DynamicallyAccessedMemberTypes.PublicMethods |
+            DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.NonPublicProperties;
+
         private static readonly ConcurrentDictionary<Key, MqttRouteTable> Cache = new ConcurrentDictionary<Key, MqttRouteTable>();
         public static readonly IComparer<MqttRoute> RoutePrecedence = Comparer<MqttRoute>.Create(RouteComparison);
 
@@ -23,6 +30,7 @@ namespace MQTTnet.AspNetCore.Routing
         /// </summary>
         /// <param name="assembly">Assemblies to scan for routes</param>
         /// <returns></returns>
+        [RequiresUnreferencedCode("Assembly scanning cannot be statically analyzed. Use CreateFromControllerTypes for Native AOT applications.")]
         internal static MqttRouteTable Create(IEnumerable<Assembly> assemblies)
         {
             var key = new Key(assemblies.OrderBy(a => a.FullName).ToArray());
@@ -39,30 +47,61 @@ namespace MQTTnet.AspNetCore.Routing
                 .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public))
                 .Where(m => !m.GetCustomAttributes(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), true).Any() && !m.IsDefined(typeof(NonActionAttribute)));
 
-            var routeTable = Create(actions);
+            var routeTable = Create(actions.Select(action => new MqttControllerAction(action, action.DeclaringType)));
 
             Cache.TryAdd(key, routeTable);
 
             return routeTable;
         }
 
-        internal static MqttRouteTable Create(IEnumerable<MethodInfo> actions)
+        [RequiresUnreferencedCode("Controller type arrays cannot be statically analyzed. Use CreateFromControllerType<TController> for Native AOT applications.")]
+        internal static MqttRouteTable CreateFromControllerTypes(IEnumerable<Type> controllerTypes)
+        {
+            var actions = controllerTypes
+                .Where(type => type.GetCustomAttribute(typeof(MqttControllerAttribute), true) != null)
+                .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public))
+                .Where(m => !m.GetCustomAttributes(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), true).Any() && !m.IsDefined(typeof(NonActionAttribute)));
+
+            return Create(actions.Select(action => new MqttControllerAction(action, action.DeclaringType)));
+        }
+
+        internal static MqttRouteTable CreateFromControllerType<[DynamicallyAccessedMembers(ControllerMemberTypes)] TController>()
+        {
+            return CreateFromControllerType(typeof(TController));
+        }
+
+        internal static MqttRouteTable CreateFromControllerType(
+            [DynamicallyAccessedMembers(ControllerMemberTypes)] Type controllerType)
+        {
+            var actions = Array.Empty<MethodInfo>();
+            if (controllerType.GetCustomAttribute(typeof(MqttControllerAttribute), true) != null)
+            {
+                actions = controllerType
+                    .GetMethods(BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public)
+                    .Where(m => !m.GetCustomAttributes(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), true).Any() && !m.IsDefined(typeof(NonActionAttribute)))
+                    .ToArray();
+            }
+
+            return Create(actions.Select(action => new MqttControllerAction(action, controllerType)));
+        }
+
+        internal static MqttRouteTable Create(IEnumerable<MqttControllerAction> actions)
         {
             // A future perf improvement would be to use a stringbuilder to avoid multiple string allocations
 
-            var templatesByHandler = new Dictionary<MethodInfo, string[]>();
+            var templatesByHandler = new Dictionary<MqttControllerAction, string[]>();
 
             foreach (var action in actions)
             {
                 // We're deliberately using inherit = false here. // MqttRouteAttribute is defined as non-inherited,
                 // because inheriting a route attribute always causes an ambiguity. You end up with two components (base
                 // class and derived class) with the same route.
-                var controllerTemplates = action.DeclaringType.GetCustomAttributes<MqttRouteAttribute>(inherit: false)
-                    .Select(c => ReplaceTokens(c.Template, action.DeclaringType.Name, action.Name) + "/")
+                var controllerTemplates = action.ControllerType.GetCustomAttributes<MqttRouteAttribute>(inherit: false)
+                    .Select(c => ReplaceTokens(c.Template, action.ControllerType.Name, action.Method.Name) + "/")
                     .ToArray();
 
-                var routeAttributes = action.GetCustomAttributes<MqttRouteAttribute>(inherit: false)
-                    .Select(a => ReplaceTokens(a.Template, action.DeclaringType.Name, action.Name))
+                var routeAttributes = action.Method.GetCustomAttributes<MqttRouteAttribute>(inherit: false)
+                    .Select(a => ReplaceTokens(a.Template, action.ControllerType.Name, action.Method.Name))
                     .ToArray();
 
                 if (controllerTemplates.Length == 0)
@@ -74,7 +113,7 @@ namespace MQTTnet.AspNetCore.Routing
                 // need to strip the "Get", "Put", etc. prefixes from the action because MQTT doesn't have verbs by convention.
                 if (routeAttributes.Length == 0)
                 {
-                    routeAttributes = new string[] { action.Name };
+                    routeAttributes = new string[] { action.Method.Name };
                 }
 
                 // If an action starts with a /, we throw away the inherited portion of the path. We don't process ~/
@@ -91,7 +130,7 @@ namespace MQTTnet.AspNetCore.Routing
         /// Generate routes given a collection of MethodInfo objects and templates that should call those methods
         /// </summary>
         /// <param name="templatesByHandler">Templates that should route to each handler</param>
-        internal static MqttRouteTable Create(Dictionary<MethodInfo, string[]> templatesByHandler)
+        internal static MqttRouteTable Create(Dictionary<MqttControllerAction, string[]> templatesByHandler)
         {
             var routes = new List<MqttRoute>();
 
@@ -109,9 +148,10 @@ namespace MQTTnet.AspNetCore.Routing
                     var unusedRouteParameterNames = allRouteParameterNames
                         .Except(GetParameterNames(parsedTemplate), StringComparer.OrdinalIgnoreCase)
                         .ToArray();
-                    var methodInfo = keyValuePair.Key;
-                    var entry = new MqttRoute(parsedTemplate, methodInfo, unusedRouteParameterNames);
-                    var mrat = methodInfo.DeclaringType.GetCustomAttribute<MqttRouteAttribute>();
+                    var methodInfo = keyValuePair.Key.Method;
+                    var controllerType = keyValuePair.Key.ControllerType;
+                    var entry = new MqttRoute(parsedTemplate, methodInfo, unusedRouteParameterNames, controllerType);
+                    var mrat = controllerType.GetCustomAttribute<MqttRouteAttribute>();
                     if (mrat != null)
                     {
                         entry.ControllerTemplate = TemplateParser.ParseTemplate(mrat.Template);
@@ -329,6 +369,22 @@ namespace MQTTnet.AspNetCore.Routing
 
                 return hash.ToHashCode();
             }
+        }
+
+        internal readonly struct MqttControllerAction
+        {
+            public MqttControllerAction(
+                MethodInfo method,
+                [DynamicallyAccessedMembers(ControllerMemberTypes)] Type controllerType)
+            {
+                Method = method;
+                ControllerType = controllerType;
+            }
+
+            public MethodInfo Method { get; }
+
+            [DynamicallyAccessedMembers(ControllerMemberTypes)]
+            public Type ControllerType { get; }
         }
     }
 }

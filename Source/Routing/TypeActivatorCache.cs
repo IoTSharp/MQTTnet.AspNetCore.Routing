@@ -6,6 +6,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 
 namespace MQTTnet.AspNetCore.Routing
 {
@@ -14,12 +15,18 @@ namespace MQTTnet.AspNetCore.Routing
     /// </summary>
     internal class TypeActivatorCache : ITypeActivatorCache
     {
-        private readonly Func<Type, ObjectFactory> _createFactory = (type) => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
+        private static ObjectFactory CreateFactory(
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type type)
+        {
+            return ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
+        }
 
         private readonly ConcurrentDictionary<Type, ObjectFactory> _typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
 
         /// <inheritdoc/>
-        public TInstance CreateInstance<TInstance>(IServiceProvider serviceProvider, Type implementationType)
+        public TInstance CreateInstance<TInstance>(
+            IServiceProvider serviceProvider,
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type implementationType)
         {
             if (serviceProvider == null)
             {
@@ -31,7 +38,11 @@ namespace MQTTnet.AspNetCore.Routing
                 throw new ArgumentNullException(nameof(implementationType));
             }
 
-            var createFactory = _typeActivatorCache.GetOrAdd(implementationType, _createFactory);
+            if (!_typeActivatorCache.TryGetValue(implementationType, out var createFactory))
+            {
+                createFactory = CreateFactory(implementationType);
+                _typeActivatorCache.TryAdd(implementationType, createFactory);
+            }
 
             return (TInstance)createFactory(serviceProvider, arguments: null);
         }

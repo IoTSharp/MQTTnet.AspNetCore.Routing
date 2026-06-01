@@ -7,10 +7,12 @@ using MQTTnet.AspNetCore.Routing;
 using MQTTnet.AspNetCore.Routing.Routing;
 using MQTTnet.Server;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.Unicode;
 
 #nullable enable
@@ -26,25 +28,62 @@ namespace MQTTnet.AspNetCore.Routing
 {
     public static class ServiceCollectionExtensions
     {
+        private const DynamicallyAccessedMemberTypes ControllerMemberTypes =
+            DynamicallyAccessedMemberTypes.PublicConstructors |
+            DynamicallyAccessedMemberTypes.PublicMethods |
+            DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.NonPublicProperties;
+
+        [RequiresUnreferencedCode("Assembly scanning cannot be statically analyzed. Use AddMqttControllers<TController> for Native AOT applications.")]
         public static IServiceCollection AddMqttControllers(this IServiceCollection services, Assembly[] fromAssemblies)
         {
             return services.AddMqttControllers(opt => opt.FromAssemblies = fromAssemblies);
         }
+        public static IServiceCollection AddMqttControllers<[DynamicallyAccessedMembers(ControllerMemberTypes)] TController>(this IServiceCollection services)
+            where TController : class
+        {
+            return services.AddMqttControllers<TController>(_ => { });
+        }
+
+        public static IServiceCollection AddMqttControllers<[DynamicallyAccessedMembers(ControllerMemberTypes)] TController>(
+            this IServiceCollection services,
+            Action<MqttRoutingOptions> options)
+            where TController : class
+        {
+            var mqttRoutingOptions = CreateOptions(options);
+
+            services.AddSingleton(mqttRoutingOptions);
+            services.AddSingleton(_ => MqttRouteTableFactory.CreateFromControllerType(typeof(TController)));
+
+            AddMqttRoutingServices(services, mqttRoutingOptions);
+            return services;
+        }
+
+        [RequiresUnreferencedCode("Assembly scanning cannot be statically analyzed. Use AddMqttControllers<TController> for Native AOT applications.")]
         public static IServiceCollection AddMqttControllers(this IServiceCollection services)
         {
             return services.AddMqttControllers(opt => { });
         }
+
+        [RequiresUnreferencedCode("Assembly scanning cannot be statically analyzed. Use AddMqttControllers<TController> for Native AOT applications.")]
         public static IServiceCollection AddMqttControllers(this IServiceCollection services, Action<MqttRoutingOptions> _options)
         {
-            var _opt = new MqttRoutingOptions();
-            _opt.WithJsonSerializerOptions();
-            _opt.FromAssemblies = null;
-            _opt.RouteInvocationInterceptor = null;
-            _options?.Invoke(_opt);
+            var _opt = CreateOptions(_options);
 
             services.AddSingleton(_opt);
             services.AddSingleton(_ =>
             {
+
+                var controllerTypes = _opt.ControllerTypes;
+                if (controllerTypes != null)
+                {
+                    if (controllerTypes.Length == 0)
+                    {
+                        throw new ArgumentException("'controllerTypes' cannot be an empty array. Pass null or a collection of 1 or more controller types.", nameof(controllerTypes));
+                    }
+
+                    return MqttRouteTableFactory.CreateFromControllerTypes(controllerTypes);
+                }
 
                 var fromAssemblies = _opt.FromAssemblies;
                 if (fromAssemblies != null && fromAssemblies.Length == 0)
@@ -56,15 +95,11 @@ namespace MQTTnet.AspNetCore.Routing
                 return MqttRouteTableFactory.Create(assemblies);
             });
             
-            services.AddSingleton<ITypeActivatorCache>(new TypeActivatorCache());
-            services.AddTransient<MqttRouter>();
-            if (_opt.RouteInvocationInterceptor != null)
-            {
-                services.AddSingleton(typeof(IRouteInvocationInterceptor), _opt.RouteInvocationInterceptor);
-            }
+            AddMqttRoutingServices(services, _opt);
             return services;
         }
-        public static void WithRouteInvocationInterceptor<T>(this MqttRoutingOptions opt) where T : IRouteInvocationInterceptor
+
+        public static void WithRouteInvocationInterceptor<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>(this MqttRoutingOptions opt) where T : IRouteInvocationInterceptor
         {
             opt.RouteInvocationInterceptor = typeof(T);
         }
@@ -87,9 +122,22 @@ namespace MQTTnet.AspNetCore.Routing
             return opt;
         }
 
+        public static MqttRoutingOptions WithJsonSerializerContext(this MqttRoutingOptions opt, JsonSerializerContext context)
+        {
+            opt.SerializerContext = context;
+            return opt;
+        }
+
         public static MqttRoutingOptions FromAssemblies(this MqttRoutingOptions opt, params Assembly[] assemblies)
         {
             opt.FromAssemblies = assemblies;
+            return opt;
+        }
+
+        [RequiresUnreferencedCode("Controller type arrays cannot be statically analyzed. Use AddMqttControllers<TController> for Native AOT applications.")]
+        public static MqttRoutingOptions FromControllerTypes(this MqttRoutingOptions opt, params Type[] controllerTypes)
+        {
+            opt.ControllerTypes = controllerTypes;
             return opt;
         }
 
@@ -144,6 +192,27 @@ namespace MQTTnet.AspNetCore.Routing
                     throw;
                 }
             };
+        }
+
+        private static MqttRoutingOptions CreateOptions(Action<MqttRoutingOptions> options)
+        {
+            var opt = new MqttRoutingOptions();
+            opt.WithJsonSerializerOptions();
+            opt.FromAssemblies = null;
+            opt.ControllerTypes = null;
+            opt.RouteInvocationInterceptor = null;
+            options?.Invoke(opt);
+            return opt;
+        }
+
+        private static void AddMqttRoutingServices(IServiceCollection services, MqttRoutingOptions options)
+        {
+            services.AddSingleton<ITypeActivatorCache>(new TypeActivatorCache());
+            services.AddTransient<MqttRouter>();
+            if (options.RouteInvocationInterceptor != null)
+            {
+                services.AddSingleton(typeof(IRouteInvocationInterceptor), options.RouteInvocationInterceptor);
+            }
         }
     }
 }

@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
@@ -14,16 +15,29 @@ namespace MQTTnet.AspNetCore.Routing
     [DebuggerDisplay("Handler = {Handler}, Template = {Template}")]
     internal class MqttRoute
     {
-        public MqttRoute(RouteTemplate template, MethodInfo handler, string[] unusedRouteParameterNames)
+        private const DynamicallyAccessedMemberTypes ControllerMemberTypes =
+            DynamicallyAccessedMemberTypes.PublicConstructors |
+            DynamicallyAccessedMemberTypes.PublicMethods |
+            DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.NonPublicProperties;
+
+        public MqttRoute(
+            RouteTemplate template,
+            MethodInfo handler,
+            string[] unusedRouteParameterNames,
+            [DynamicallyAccessedMembers(ControllerMemberTypes)] Type controllerType)
         {
             Template = template;
             UnusedRouteParameterNames = unusedRouteParameterNames;
             Handler = handler;
+            ControllerType = controllerType;
         }
 
         public RouteTemplate Template { get; }
         public string[] UnusedRouteParameterNames { get; }
         public MethodInfo Handler { get; }
+        [DynamicallyAccessedMembers(ControllerMemberTypes)]
+        public Type ControllerType { get; }
         public RouteTemplate ControllerTemplate { get; internal set; }
         public bool HaveControllerParameter { get; internal set; }
 
@@ -130,6 +144,7 @@ namespace MQTTnet.AspNetCore.Routing
             {
                 context.Parameters = parameters;
                 context.Handler = Handler;
+                context.ControllerType = ControllerType;
                 context.HaveControllerParameter = HaveControllerParameter;
                 context.ControllerTemplate = ControllerTemplate;
             }

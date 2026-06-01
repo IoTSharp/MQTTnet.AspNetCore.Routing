@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading.Tasks;
 
 #nullable enable
@@ -58,7 +59,7 @@ namespace MQTTnet.AspNetCore.Routing
             {
                 using (var scope = svcProvider.CreateScope())
                 {
-                    Type? declaringType = routeContext.Handler.DeclaringType;
+                    Type? declaringType = routeContext.ControllerType;
 
                     if (declaringType == null)
                     {
@@ -182,12 +183,24 @@ namespace MQTTnet.AspNetCore.Routing
         {
             if (param.IsDefined(typeof(FromPayloadAttribute), false))
             {
-                JsonSerializerOptions? defaultOptions =
-                    serviceProvider.GetService<MqttRoutingOptions>()?.SerializerOptions;
-                return JsonSerializer.Deserialize(new ReadOnlySpan<byte>(controllerContext.MqttContext.ApplicationMessage.Payload.ToArray()),
-                    param.ParameterType,
-                    defaultOptions
-                );
+                var routingOptions = serviceProvider.GetService<MqttRoutingOptions>();
+                JsonTypeInfo? jsonTypeInfo = routingOptions?.SerializerContext?.GetTypeInfo(param.ParameterType);
+                if (jsonTypeInfo != null)
+                {
+                    return JsonSerializer.Deserialize(
+                        new ReadOnlySpan<byte>(controllerContext.MqttContext.ApplicationMessage.Payload.ToArray()),
+                        jsonTypeInfo);
+                }
+
+                jsonTypeInfo = routingOptions?.SerializerOptions?.GetTypeInfo(param.ParameterType);
+                if (jsonTypeInfo == null)
+                {
+                    throw new InvalidOperationException($"No JSON type metadata is configured for '{param.ParameterType.FullName}'.");
+                }
+
+                return JsonSerializer.Deserialize(
+                    new ReadOnlySpan<byte>(controllerContext.MqttContext.ApplicationMessage.Payload.ToArray()),
+                    jsonTypeInfo);
             }
             object? value = null;
             if (param?.Name!=null &&  !availableParmeters.TryGetValue(param.Name, out   value))

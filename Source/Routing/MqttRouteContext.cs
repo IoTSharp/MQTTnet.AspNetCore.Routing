@@ -5,12 +5,19 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace MQTTnet.AspNetCore.Routing
 {
     internal class MqttRouteContext
     {
+        private const DynamicallyAccessedMemberTypes ControllerMemberTypes =
+            DynamicallyAccessedMemberTypes.PublicConstructors |
+            DynamicallyAccessedMemberTypes.PublicMethods |
+            DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.NonPublicProperties;
+
         private static readonly char[] Separator = new[] { '/' };
 
         public MqttRouteContext(string path)
@@ -30,6 +37,8 @@ namespace MQTTnet.AspNetCore.Routing
 
         public MethodInfo Handler { get; set; }
 
+        [DynamicallyAccessedMembers(ControllerMemberTypes)]
+        public Type ControllerType { get; set; }
         public IReadOnlyDictionary<string, object> Parameters { get; set; }
         public bool HaveControllerParameter { get; internal set; }
         public RouteTemplate ControllerTemplate { get; internal set; }
