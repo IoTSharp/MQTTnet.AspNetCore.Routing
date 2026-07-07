@@ -1,0 +1,13 @@
+<Project>
+  <!--
+    Boundary file for git-submodule consumption. NuGet Central Package Management discovers
+    Directory.Packages.props by walking UP the tree with GetPathOfFileAbove, which stops at the
+    FIRST match. Without this file the search would reach the parent repo's Directory.Packages.props
+    (which explicitly sets ManagePackageVersionsCentrally=true) and force CPM onto this library,
+    breaking its inline PackageReference versions (NU1008). This empty boundary keeps CPM OFF so
+    the library builds under its own settings, standalone or as a submodule.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

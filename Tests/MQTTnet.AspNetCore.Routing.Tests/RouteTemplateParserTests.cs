@@ -152,7 +152,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             // Act
 
             // Assert
-            Assert.ThrowsException<InvalidOperationException>(() => TemplateParser.ParseTemplate(template));
+            Assert.ThrowsExactly<InvalidOperationException>(() => TemplateParser.ParseTemplate(template));
         }
 
         [TestMethod]
@@ -164,7 +164,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             // Act
 
             // Assert
-            Assert.ThrowsException<InvalidOperationException>(() => TemplateParser.ParseTemplate(template));
+            Assert.ThrowsExactly<InvalidOperationException>(() => TemplateParser.ParseTemplate(template));
         }
 
         [TestMethod]
@@ -176,7 +176,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             // Act
 
             // Assert
-            Assert.ThrowsException<InvalidOperationException>(() => TemplateParser.ParseTemplate(template));
+            Assert.ThrowsExactly<InvalidOperationException>(() => TemplateParser.ParseTemplate(template));
         }
     }
 }

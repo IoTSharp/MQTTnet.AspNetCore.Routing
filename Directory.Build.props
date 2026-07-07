@@ -1,0 +1,17 @@
+<Project>
+  <!--
+    Insulation boundary when this repository is consumed as a git submodule of another repo
+    (e.g. IoTSharp/SonnetDB). MSBuild's Directory.Build.props / Directory.Packages.props
+    discovery walks UP the directory tree and stops at the first file it finds. Placing this
+    file at the submodule root stops that walk here, so the parent repo's build settings
+    (central package management, TreatWarningsAsErrors, single-TFM pinning, nullable policy)
+    do NOT leak into this library and it always builds under its own settings.
+  -->
+  <PropertyGroup>
+    <!--
+      This project declares its package versions inline (MQTTnet 5.1.*). The parent repo may
+      enable central package management; keep it OFF here so those inline versions remain valid.
+    -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

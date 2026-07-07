@@ -27,7 +27,12 @@
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 		<EnableNETAnalyzers>true</EnableNETAnalyzers>
 		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
- 
+		<!--
+			Turn on the trim/AOT Roslyn analyzers (EnableTrimAnalyzer + EnableAotAnalyzer) so any
+			future edit that reintroduces unannotated reflection surfaces IL2xxx/IL3xxx at build
+			time. The current source is already AOT-clean.
+		-->
+		<IsAotCompatible>true</IsAotCompatible>
 	</PropertyGroup>
 	<ItemGroup>
 		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
@@ -37,8 +42,8 @@
 
 
 	<ItemGroup>
-		<PackageReference Include="MQTTnet" Version="5.1.*" />
-		<PackageReference Include="MQTTnet.AspNetCore" Version="5.1.*" />
+		<PackageReference Include="MQTTnet" Version="5.2.0.1603" />
+		<PackageReference Include="MQTTnet.AspNetCore" Version="5.2.0.1603" />
 	</ItemGroup>
 
 	<ItemGroup>
