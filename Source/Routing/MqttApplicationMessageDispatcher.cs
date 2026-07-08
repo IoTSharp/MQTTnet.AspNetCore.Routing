@@ -41,6 +41,7 @@ namespace MQTTnet.AspNetCore.Routing
                 applicationMessage,
                 clientId,
                 routeValues,
+                route.RouteModel,
                 cancellationToken);
 
             try

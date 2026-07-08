@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using MQTTnet;
 using MQTTnet.AspNetCore.Routing.Attributes;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
@@ -11,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -77,6 +79,32 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.AreEqual("Online:<null>", typed.PayloadText);
             Assert.AreEqual(deviceId.ToString("D"), typedWithRevision.DeviceId);
             Assert.AreEqual("Offline:42", typedWithRevision.PayloadText);
+        }
+
+        [TestMethod]
+        public async Task FullRouting_ServerMode_BindsR3Sources()
+        {
+            var recorder = new FullRoutingRecorder();
+            using var services = BuildFullRoutingServices(recorder);
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-r3-publisher");
+
+            var publishResult = await publisher.Client.PublishAsync(
+                MqttMessage(
+                    "full/devices/r3-device/r3",
+                    "{\"Temperature\":18.75}",
+                    ("trace-id", "trace-42")),
+                CancellationToken.None);
+
+            Assert.IsTrue(publishResult.IsSuccess, publishResult.ReasonString);
+
+            var record = await recorder.ExpectAsync("r3-binding");
+
+            Assert.AreEqual("r3-device", record.DeviceId);
+            Assert.AreEqual(18.75, record.Temperature);
+            Assert.AreEqual("full-routing-r3-publisher", record.ClientId);
+            Assert.AreEqual("full/devices/r3-device/r3", record.Topic);
+            Assert.AreEqual("full-routing-r3-publisher|trace-42|full/devices/r3-device/r3|True|True", record.PayloadText);
         }
 
         [TestMethod]
@@ -345,13 +373,24 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.IsTrue(errors.Any(error => error.ErrorCode == errorCode));
         }
 
-        private static MqttApplicationMessage MqttMessage(string topic, string payload)
+        private static MqttApplicationMessage MqttMessage(
+            string topic,
+            string payload,
+            params (string Name, string Value)[] userProperties)
         {
-            return new MqttApplicationMessageBuilder()
+            var builder = new MqttApplicationMessageBuilder()
                 .WithTopic(topic)
                 .WithPayload(payload)
-                .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtMostOnce)
-                .Build();
+                .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtMostOnce);
+
+            foreach (var userProperty in userProperties)
+            {
+                builder.WithUserProperty(
+                    userProperty.Name,
+                    Encoding.UTF8.GetBytes(userProperty.Value));
+            }
+
+            return builder.Build();
         }
 
         private static MqttPublishPacket MqttPublishPacket(MqttApplicationMessage message)
@@ -416,6 +455,29 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                         deviceId.ToString("D"),
                         null,
                         $"{mode}:{(revision.HasValue ? revision.Value.ToString() : "<null>")}",
+                        ClientId,
+                        Message.Topic,
+                        Server));
+
+                return Ok();
+            }
+
+            [MqttRoute("{deviceId}/r3")]
+            public Task R3Binding(
+                [FromMqttRoute("deviceId")] string deviceId,
+                [FromMqttPayload] FullTelemetryPayload payload,
+                [FromMqttClient] string clientId,
+                [FromMqttUserProperty("trace-id")] string traceId,
+                MqttRequestContext requestContext,
+                MqttActionContext actionContext,
+                MqttApplicationMessage message)
+            {
+                _recorder.Record(
+                    "r3-binding",
+                    new FullRouteRecord(
+                        deviceId,
+                        payload.Temperature,
+                        $"{clientId}|{traceId}|{requestContext.Topic}|{ReferenceEquals(requestContext, actionContext.RequestContext)}|{ReferenceEquals(message, requestContext.Message)}",
                         ClientId,
                         Message.Topic,
                         Server));

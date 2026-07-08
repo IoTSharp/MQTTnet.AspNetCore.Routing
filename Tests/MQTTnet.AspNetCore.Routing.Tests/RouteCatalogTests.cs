@@ -27,6 +27,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             var telemetryAction = controller.Actions.Single(action => action.Name == nameof(CatalogController.Telemetry));
             var payloadParameter = telemetryAction.Parameters.Single(parameter => parameter.Name == "payload");
             var deviceIdParameter = telemetryRoute.RouteParameters.Single(parameter => parameter.Name == "deviceId");
+            var r3Action = controller.Actions.Single(action => action.Name == nameof(CatalogController.R3Binding));
             var snapshot = catalog.CreateSnapshot();
 
             Assert.IsFalse(catalog.HasErrors);
@@ -37,6 +38,12 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.AreEqual(typeof(CatalogPayload), telemetryRoute.PayloadType);
             Assert.AreEqual(MqttBindingSource.Payload, payloadParameter.BindingSource);
             Assert.AreEqual(MqttBindingSource.Route, deviceIdParameter.BindingSource);
+            Assert.AreEqual(MqttBindingSource.Route, r3Action.Parameters.Single(parameter => parameter.Name == "deviceId").BindingSource);
+            Assert.AreEqual(MqttBindingSource.Payload, r3Action.Parameters.Single(parameter => parameter.Name == "payload").BindingSource);
+            Assert.AreEqual(MqttBindingSource.Client, r3Action.Parameters.Single(parameter => parameter.Name == "clientId").BindingSource);
+            Assert.AreEqual(MqttBindingSource.UserProperty, r3Action.Parameters.Single(parameter => parameter.Name == "traceId").BindingSource);
+            Assert.AreEqual(MqttBindingSource.Session, r3Action.Parameters.Single(parameter => parameter.Name == "tenant").BindingSource);
+            Assert.AreEqual(MqttBindingSource.Context, r3Action.Parameters.Single(parameter => parameter.Name == "requestContext").BindingSource);
             CollectionAssert.Contains(deviceIdParameter.RouteConstraints.ToArray(), "guid");
             StringAssert.Contains(snapshot, "ControllerAction catalog/devices/{deviceId:guid}/telemetry");
             StringAssert.Contains(snapshot, "payload=CatalogPayload");
@@ -137,6 +144,17 @@ namespace MQTTnet.AspNetCore.Routing.Tests
 
             [MqttRoute("{deviceId:guid}/status")]
             public void Status(Guid deviceId)
+            {
+            }
+
+            [MqttRoute("{deviceId:guid}/r3")]
+            public void R3Binding(
+                [FromMqttRoute("deviceId")] Guid deviceId,
+                [FromMqttPayload] CatalogPayload payload,
+                [FromMqttClient] string clientId,
+                [FromMqttUserProperty("trace-id")] string traceId,
+                [FromMqttSession("tenant")] string tenant,
+                MqttRequestContext requestContext)
             {
             }
         }

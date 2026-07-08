@@ -143,7 +143,7 @@ MQTT routing 也应保持这个分层:
 | 1 | `✅` | R0 边界与收敛决策 | 固定库边界、两套路由的收敛策略、上游策略、public/internal API 现状 | 无 |
 | 2 | `✅` | R1 绑定正确性 | 统一 model state,修复 Guid/enum/nullable 转换,两路径去除 payload 复制 | R0 |
 | 3 | `✅` | R2 Application Model 与 Route Catalog | controller/action/route 元数据显式化,后续 binding/result/filter 都依赖它 | R1 |
-| 4 | `⬜` | R3 Binding 体系 | MQTT 专用 binding source,替代零散反射绑定 | R2 |
+| 4 | `🚧` | R3 Binding 体系 | MQTT 专用 binding source,替代零散反射绑定 | R2 |
 | 5 | `⬜` | R4 Result 体系 | MQTT result 与 return type executor | R2、R3 |
 | 6 | `⬜` | R5 Filter 管线 | 授权、资源、action、异常、result 扩展点 | R2、R3、R4 |
 | 7 | `🧪` | R6 性能与 AOT | 缓存热路径、显式注册、trimming 基线 | R1-R5 |
@@ -254,7 +254,7 @@ catalog 必须保持业务中立,不内置任何消费程序的 route 分类。r
 - 消费程序可以在测试中读取 route catalog。
 - route 冲突能在启动或测试阶段暴露。
 
-### ⬜ R3:Binding 体系
+### 🚧 R3:Binding 体系
 
 目标:在 R1 修好的绑定基础上,补齐 MQTT 专用 binding source 和上下文类型。
 
@@ -270,6 +270,14 @@ catalog 必须保持业务中立,不内置任何消费程序的 route 分类。r
 - formatter 选择依据:attribute 显式声明、MQTT v5 content type、route metadata、fallback 默认配置。
 
 context 应能从 `InterceptingPublishEventArgs` / `MqttApplicationMessageRouteContext` 适配,同时不阻断现有 `MqttBaseController` 使用方式。
+
+当前进展:
+
+- `🚧` 已新增 `[FromMqttRoute]`、`[FromMqttPayload]`、`[FromMqttSession]`、`[FromMqttClient]`、`[FromMqttUserProperty]`、`[FromMqttContext]`,并保留旧 `[FromPayload]` 兼容入口。
+- `🚧` 已新增 `MqttRequestContext`、`MqttRouteContext`、`MqttActionContext`,controller 路径和 slim 路径都能适配到同一套上下文。
+- `🚧` 已新增 `IMqttPayloadInputFormatter` / `IMqttPayloadOutputFormatter` 及内置 JSON、binary formatter。
+- `🚧` controller action 参数已接入统一 binder,支持 route、JSON payload、raw payload、session item、clientId/userName、user property 和上下文类型绑定。
+- `⬜` route metadata 参与 formatter 选择、result 体系复用 output formatter、更多测试辅助 API 仍在后续 R3/R4/R7 中继续完善。
 
 验收:
 

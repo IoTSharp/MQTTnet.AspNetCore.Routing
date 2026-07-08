@@ -4,13 +4,16 @@
 // Modifications Copyright (c) Atlas Lift Tech Inc. All rights reserved.
 
 using Microsoft.AspNetCore.Mvc;
+using MQTTnet;
 using MQTTnet.AspNetCore.Routing.Attributes;
+using MQTTnet.Server;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 
 namespace MQTTnet.AspNetCore.Routing
 {
@@ -302,9 +305,7 @@ namespace MQTTnet.AspNetCore.Routing
 
         private static MqttParameterModel CreateActionParameterModel(ParameterInfo parameter)
         {
-            var bindingSource = parameter.IsDefined(typeof(FromPayloadAttribute), inherit: false)
-                ? MqttBindingSource.Payload
-                : MqttBindingSource.Route;
+            var bindingSource = GetActionParameterBindingSource(parameter);
 
             TryGetParameterDefaultValue(parameter, out var defaultValue);
             return new MqttParameterModel(
@@ -315,6 +316,55 @@ namespace MQTTnet.AspNetCore.Routing
                 parameter.IsOptional || parameter.HasDefaultValue,
                 defaultValue,
                 metadata: parameter.GetCustomAttributes(inherit: false).Cast<object>());
+        }
+
+        private static MqttBindingSource GetActionParameterBindingSource(ParameterInfo parameter)
+        {
+            if (parameter.IsDefined(typeof(FromMqttRouteAttribute), inherit: false))
+            {
+                return MqttBindingSource.Route;
+            }
+
+            if (parameter.IsDefined(typeof(FromMqttPayloadAttribute), inherit: false)
+                || parameter.IsDefined(typeof(FromPayloadAttribute), inherit: false))
+            {
+                return MqttBindingSource.Payload;
+            }
+
+            if (parameter.IsDefined(typeof(FromMqttSessionAttribute), inherit: false))
+            {
+                return MqttBindingSource.Session;
+            }
+
+            if (parameter.IsDefined(typeof(FromMqttClientAttribute), inherit: false))
+            {
+                return MqttBindingSource.Client;
+            }
+
+            if (parameter.IsDefined(typeof(FromMqttUserPropertyAttribute), inherit: false))
+            {
+                return MqttBindingSource.UserProperty;
+            }
+
+            if (parameter.IsDefined(typeof(FromMqttContextAttribute), inherit: false)
+                || IsContextParameterType(parameter.ParameterType))
+            {
+                return MqttBindingSource.Context;
+            }
+
+            return MqttBindingSource.Route;
+        }
+
+        private static bool IsContextParameterType(Type parameterType)
+        {
+            return parameterType == typeof(MqttActionContext)
+                || parameterType == typeof(MqttRequestContext)
+                || parameterType == typeof(MqttRouteContext)
+                || parameterType == typeof(MqttModelStateDictionary)
+                || parameterType == typeof(MqttApplicationMessage)
+                || parameterType == typeof(IServiceProvider)
+                || parameterType == typeof(CancellationToken)
+                || parameterType == typeof(MqttServer);
         }
 
         private static MqttParameterModel[] CreateRouteParameterModels(RouteTemplate routeTemplate)

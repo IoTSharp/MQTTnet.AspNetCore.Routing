@@ -16,6 +16,7 @@ namespace MQTTnet.AspNetCore.Routing
             MqttApplicationMessage message,
             string? clientId,
             IReadOnlyDictionary<string, string> routeValues,
+            MqttRouteModel? routeModel,
             CancellationToken cancellationToken)
         {
             Services = services;
@@ -23,6 +24,18 @@ namespace MQTTnet.AspNetCore.Routing
             ClientId = clientId;
             RouteValues = routeValues;
             CancellationToken = cancellationToken;
+            RequestContext = new MqttRequestContext(
+                message,
+                clientId,
+                cancellationToken: cancellationToken);
+            RouteContext = new MqttRouteContext(
+                routeModel,
+                MqttRouteContext.ToRouteValues(routeValues));
+            ActionContext = new MqttActionContext(
+                RequestContext,
+                RouteContext,
+                ModelState,
+                services);
         }
 
         public IServiceProvider Services { get; }
@@ -34,6 +47,21 @@ namespace MQTTnet.AspNetCore.Routing
         public IReadOnlyDictionary<string, string> RouteValues { get; }
 
         public CancellationToken CancellationToken { get; }
+
+        /// <summary>
+        /// 当前消息的 R3 请求上下文。
+        /// </summary>
+        public MqttRequestContext RequestContext { get; }
+
+        /// <summary>
+        /// 当前消息的 R3 route 上下文。
+        /// </summary>
+        public MqttRouteContext RouteContext { get; }
+
+        /// <summary>
+        /// 当前消息的 R3 action 上下文。
+        /// </summary>
+        public MqttActionContext ActionContext { get; }
 
         /// <summary>
         /// 当前消息路由和绑定过程产生的错误。

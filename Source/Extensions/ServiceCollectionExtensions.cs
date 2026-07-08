@@ -203,6 +203,10 @@ namespace MQTTnet.AspNetCore.Routing
             opt.FromAssemblies = null;
             opt.ControllerTypes = null;
             opt.RouteInvocationInterceptor = null;
+            opt.InputFormatters.Add(new MqttBinaryPayloadInputFormatter());
+            opt.InputFormatters.Add(new MqttJsonPayloadInputFormatter());
+            opt.OutputFormatters.Add(new MqttBinaryPayloadOutputFormatter());
+            opt.OutputFormatters.Add(new MqttJsonPayloadOutputFormatter());
             options?.Invoke(opt);
             return opt;
         }
@@ -210,6 +214,7 @@ namespace MQTTnet.AspNetCore.Routing
         private static void AddMqttRoutingServices(IServiceCollection services, MqttRoutingOptions options)
         {
             services.AddSingleton<ITypeActivatorCache>(new TypeActivatorCache());
+            services.AddSingleton<MqttActionParameterBinder>();
             services.AddTransient<MqttRouter>();
             if (options.RouteInvocationInterceptor != null)
             {

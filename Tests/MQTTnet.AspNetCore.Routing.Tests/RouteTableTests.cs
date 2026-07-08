@@ -73,7 +73,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                         new TemplateSegment(routes[2], "route", false),
                     }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
             };
-            var context = new MqttRouteContext("super/awesome");
+            var context = new MqttRouteMatchContext("super/awesome");
 
             // Act
             var MockTable = new MqttRouteTable(MockRoutes);
@@ -117,7 +117,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                     }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
             };
 
-            var context = new MqttRouteContext("super/duper");
+            var context = new MqttRouteMatchContext("super/duper");
 
             // Act
             var MockTable = new MqttRouteTable(MockRoutes);
@@ -161,7 +161,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                     }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
             };
 
-            var context = new MqttRouteContext("super/cool");
+            var context = new MqttRouteMatchContext("super/cool");
 
             // Act
             var MockTable = new MqttRouteTable(MockRoutes);
@@ -205,7 +205,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                         new TemplateSegment(routes[2], "route", false),
                     }), MockMethod2, new string[] { }, typeof(RouteTableTests)),
             };
-            var context = new MqttRouteContext("super/miss");
+            var context = new MqttRouteMatchContext("super/miss");
 
             // Act
             var MockTable = new MqttRouteTable(MockRoutes);
@@ -255,9 +255,9 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.AreEqual("child-001", childAlias.Parameters["device"]);
         }
 
-        private static MqttRouteContext Route(MqttRouteTable routeTable, string topic)
+        private static MqttRouteMatchContext Route(MqttRouteTable routeTable, string topic)
         {
-            var context = new MqttRouteContext(topic);
+            var context = new MqttRouteMatchContext(topic);
             routeTable.Route(context);
             Assert.IsNotNull(context.Handler, $"Expected '{topic}' to match a route.");
             Assert.IsNotNull(context.ControllerType, $"Expected '{topic}' to resolve a controller type.");

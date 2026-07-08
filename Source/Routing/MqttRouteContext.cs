@@ -10,7 +10,7 @@ using System.Reflection;
 
 namespace MQTTnet.AspNetCore.Routing
 {
-    internal class MqttRouteContext
+    internal class MqttRouteMatchContext
     {
         private const DynamicallyAccessedMemberTypes ControllerMemberTypes =
             DynamicallyAccessedMemberTypes.PublicConstructors |
@@ -20,7 +20,7 @@ namespace MQTTnet.AspNetCore.Routing
 
         private static readonly char[] Separator = new[] { '/' };
 
-        public MqttRouteContext(string path)
+        public MqttRouteMatchContext(string path)
         {
             // This is a simplification. We are assuming there are no paths like /a//b/. A proper routing implementation
             // would be more sophisticated.

@@ -5,13 +5,10 @@ using Microsoft.Extensions.Logging;
 using MQTTnet.AspNetCore.Routing.Attributes;
 using MQTTnet.Server;
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
 using System.Threading.Tasks;
 
 #nullable enable
@@ -23,14 +20,20 @@ namespace MQTTnet.AspNetCore.Routing
         private readonly ILogger<MqttRouter> logger;
         private readonly MqttRouteTable routeTable;
         private readonly ITypeActivatorCache typeActivator;
+        private readonly MqttActionParameterBinder parameterBinder;
 
         public MqttServer? Server { get; set; }
 
-        public MqttRouter(ILogger<MqttRouter> logger, MqttRouteTable routeTable, ITypeActivatorCache typeActivator)
+        public MqttRouter(
+            ILogger<MqttRouter> logger,
+            MqttRouteTable routeTable,
+            ITypeActivatorCache typeActivator,
+            MqttActionParameterBinder parameterBinder)
         {
             this.logger = logger;
             this.routeTable = routeTable;
             this.typeActivator = typeActivator;
+            this.parameterBinder = parameterBinder;
         }
 
         internal async Task OnIncomingApplicationMessage(IServiceProvider svcProvider, InterceptingPublishEventArgs context, bool allowUnmatchedRoutes)
@@ -42,7 +45,7 @@ namespace MQTTnet.AspNetCore.Routing
                 return;
             }
 
-            var routeContext = new MqttRouteContext(context.ApplicationMessage.Topic);
+            var routeContext = new MqttRouteMatchContext(context.ApplicationMessage.Topic);
 
             routeTable.Route(routeContext);
 
@@ -91,6 +94,23 @@ namespace MQTTnet.AspNetCore.Routing
                         MqttContext = context,
                         MqttServer = Server
                     };
+                    using var loggerScope = logger.BeginScope(new Dictionary<string, object?>
+                    {
+                        ["mqtt.client_id"] = context.ClientId,
+                        ["mqtt.topic"] = context.ApplicationMessage.Topic,
+                        ["mqtt.route"] = routeContext.RouteModel?.Template,
+                        ["mqtt.action"] = routeContext.Handler?.Name
+                    });
+                    var actionContext = new MqttActionContext(
+                        MqttRequestContext.FromInterceptingPublish(context),
+                        new MqttRouteContext(
+                            routeContext.RouteModel,
+                            MqttRouteContext.ToRouteValues(routeContext.Parameters)),
+                        controllerContext.ModelState,
+                        scope.ServiceProvider,
+                        loggerScope,
+                        Server);
+                    controllerContext.ActionContext = actionContext;
 
                     for (int i = 0; i < activateProperties.Length; i++)
                     {
@@ -115,13 +135,14 @@ namespace MQTTnet.AspNetCore.Routing
                             return;
                         }
                     }
-                    ParameterInfo[] parameters = routeContext.Handler.GetParameters();
+                    var handler = routeContext.Handler ?? throw new InvalidOperationException("Matched MQTT route does not have an action handler.");
+                    ParameterInfo[] parameters = handler.GetParameters();
 
                     context.ProcessPublish = true;
 
                     if (parameters.Length == 0)
                     {
-                        await HandlerInvoker(routeContext.Handler, classInstance, null).ConfigureAwait(false);
+                        await HandlerInvoker(handler, classInstance, null).ConfigureAwait(false);
                     }
                     else
                     {
@@ -129,12 +150,11 @@ namespace MQTTnet.AspNetCore.Routing
 
                         try
                         {
-                            paramArray = parameters.Select(p =>
-                                    MatchParameterOrThrow(p, routeContext.Parameters, controllerContext, svcProvider)
-                                )
-                                .ToArray();
+                            paramArray = await parameterBinder
+                                .BindAsync(parameters, actionContext)
+                                .ConfigureAwait(false);
 
-                            await HandlerInvoker(routeContext.Handler, classInstance, paramArray).ConfigureAwait(false);
+                            await HandlerInvoker(handler, classInstance, paramArray).ConfigureAwait(false);
                         }
                         catch (MqttBindingException ex)
                         {
@@ -207,7 +227,7 @@ namespace MQTTnet.AspNetCore.Routing
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]
             Type declaringType,
             object classInstance,
-            MqttRouteContext routeContext,
+            MqttRouteMatchContext routeContext,
             MqttControllerContext controllerContext)
         {
             if (routeContext.ControllerTemplate == null || routeContext.Parameters == null)
@@ -243,110 +263,5 @@ namespace MQTTnet.AspNetCore.Routing
             return true;
         }
 
-        private static object? MatchParameterOrThrow(ParameterInfo param,
-            IReadOnlyDictionary<string, object> availableParmeters, MqttControllerContext controllerContext,
-            IServiceProvider serviceProvider)
-        {
-            if (param.IsDefined(typeof(FromPayloadAttribute), false))
-            {
-                var routingOptions = serviceProvider.GetService<MqttRoutingOptions>();
-                JsonTypeInfo? jsonTypeInfo = routingOptions?.SerializerContext?.GetTypeInfo(param.ParameterType);
-                if (jsonTypeInfo != null)
-                {
-                    return DeserializePayloadOrThrow(param, controllerContext, jsonTypeInfo);
-                }
-
-                jsonTypeInfo = routingOptions?.SerializerOptions?.GetTypeInfo(param.ParameterType);
-                if (jsonTypeInfo == null)
-                {
-                    throw new InvalidOperationException($"No JSON type metadata is configured for '{param.ParameterType.FullName}'.");
-                }
-
-                return DeserializePayloadOrThrow(param, controllerContext, jsonTypeInfo);
-            }
-            object? value = null;
-            if (param.Name == null || availableParmeters == null || !availableParmeters.TryGetValue(param.Name, out value))
-            {
-                if (TryGetParameterDefaultValue(param, out var defaultValue))
-                {
-                    return defaultValue;
-                }
-
-                var key = param.Name ?? "$parameter";
-                controllerContext.ModelState.AddModelError(
-                    key,
-                    MqttBindingErrorCode.MissingRouteValue,
-                    "Route value is required.");
-                throw new MqttBindingException(
-                    controllerContext.ModelState,
-                    $"No matching route parameter for \"{param.ParameterType.Name} {param.Name}\"");
-            }
-
-            if (value == null && TryGetParameterDefaultValue(param, out var optionalDefaultValue))
-            {
-                return optionalDefaultValue;
-            }
-
-            if (!MqttRouteValueConverter.TryConvert(
-                    value,
-                    param.ParameterType,
-                    out var convertedValue,
-                    out var routeValueError))
-            {
-                var key = param.Name ?? "$parameter";
-                controllerContext.ModelState.AddModelError(
-                    key,
-                    MqttBindingErrorCode.TypeConversionFailed,
-                    routeValueError ?? "Route value conversion failed.");
-                throw new MqttBindingException(
-                    controllerContext.ModelState,
-                    $"Cannot assign route value to parameter \"{param.ParameterType.Name} {param.Name}\"");
-            }
-
-            return convertedValue;
-        }
-
-        private static object? DeserializePayloadOrThrow(
-            ParameterInfo param,
-            MqttControllerContext controllerContext,
-            JsonTypeInfo jsonTypeInfo)
-        {
-            try
-            {
-                return MqttJsonPayloadSerializer.Deserialize(
-                    controllerContext.MqttContext.ApplicationMessage.Payload,
-                    jsonTypeInfo);
-            }
-            catch (JsonException ex)
-            {
-                var key = param.Name ?? "$payload";
-                controllerContext.ModelState.AddModelError(
-                    key,
-                    MqttBindingErrorCode.PayloadDeserializationFailed,
-                    "MQTT payload could not be deserialized.");
-                throw new MqttBindingException(
-                    controllerContext.ModelState,
-                    "MQTT payload could not be deserialized.",
-                    ex);
-            }
-        }
-
-        private static bool TryGetParameterDefaultValue(ParameterInfo param, out object? defaultValue)
-        {
-            if (param.HasDefaultValue)
-            {
-                defaultValue = param.DefaultValue == DBNull.Value ? null : param.DefaultValue;
-                return true;
-            }
-
-            if (param.IsOptional)
-            {
-                defaultValue = null;
-                return true;
-            }
-
-            defaultValue = null;
-            return false;
-        }
     }
 }

@@ -53,7 +53,7 @@ namespace MQTTnet.AspNetCore.Routing
         public bool HaveControllerParameter { get; internal set; }
         public MqttRouteModel RouteModel { get; }
 
-        internal void Match(MqttRouteContext context)
+        internal void Match(MqttRouteMatchContext context)
         {
             string catchAllValue = null;
 

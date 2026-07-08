@@ -22,7 +22,7 @@ namespace MQTTnet.AspNetCore.Routing
 
         public MqttRouteCatalog Catalog { get; }
 
-        internal void Route(MqttRouteContext routeContext)
+        internal void Route(MqttRouteMatchContext routeContext)
         {
             for (var i = 0; i < Routes.Length; i++)
             {
