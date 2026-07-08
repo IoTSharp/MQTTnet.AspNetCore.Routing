@@ -218,5 +218,82 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.AreNotSame(MockMethod, MockMethod2);
             Assert.IsNull(context.Handler);
         }
+
+        [TestMethod]
+        public void RouteTableFactory_AllowsMultipleControllerRoutePrefixes()
+        {
+            var routeTable = MqttRouteTableFactory.CreateFromControllerType<MultiplePrefixController>();
+
+            var primary = Route(routeTable, "multi/primary/status");
+            var alias = Route(routeTable, "multi/alias/status");
+
+            Assert.AreEqual(nameof(MultiplePrefixController.Status), primary.Handler.Name);
+            Assert.AreEqual(typeof(MultiplePrefixController), primary.ControllerType);
+            Assert.AreEqual(nameof(MultiplePrefixController.Status), alias.Handler.Name);
+            Assert.AreEqual(typeof(MultiplePrefixController), alias.ControllerType);
+        }
+
+        [TestMethod]
+        public void RouteTableFactory_InheritedControllerActionsUseDerivedControllerPrefix()
+        {
+            var routeTable = MqttRouteTableFactory.CreateFromControllerTypes(new[]
+            {
+                typeof(BaseGatewayController),
+                typeof(ThingsBoardGatewayController)
+            });
+
+            var platform = Route(routeTable, "gateway/telemetry");
+            var alias = Route(routeTable, "v1/gateway/telemetry");
+            var childAlias = Route(routeTable, "v1/gateway/child-001/connect");
+
+            Assert.AreEqual(nameof(BaseGatewayController.Telemetry), platform.Handler.Name);
+            Assert.AreEqual(typeof(BaseGatewayController), platform.ControllerType);
+            Assert.AreEqual(nameof(BaseGatewayController.Telemetry), alias.Handler.Name);
+            Assert.AreEqual(typeof(ThingsBoardGatewayController), alias.ControllerType);
+            Assert.AreEqual(nameof(BaseGatewayController.Connect), childAlias.Handler.Name);
+            Assert.AreEqual(typeof(ThingsBoardGatewayController), childAlias.ControllerType);
+            Assert.AreEqual("child-001", childAlias.Parameters["device"]);
+        }
+
+        private static MqttRouteContext Route(MqttRouteTable routeTable, string topic)
+        {
+            var context = new MqttRouteContext(topic);
+            routeTable.Route(context);
+            Assert.IsNotNull(context.Handler, $"Expected '{topic}' to match a route.");
+            Assert.IsNotNull(context.ControllerType, $"Expected '{topic}' to resolve a controller type.");
+            return context;
+        }
+
+        [MqttController]
+        [MqttRoute("multi/primary")]
+        [MqttRoute("multi/alias")]
+        private sealed class MultiplePrefixController
+        {
+            [MqttRoute("status")]
+            public void Status()
+            {
+            }
+        }
+
+        [MqttController]
+        [MqttRoute("gateway")]
+        private class BaseGatewayController
+        {
+            [MqttRoute("telemetry")]
+            public void Telemetry()
+            {
+            }
+
+            [MqttRoute("{device}/connect")]
+            public void Connect(string device)
+            {
+            }
+        }
+
+        [MqttController]
+        [MqttRoute("v1/gateway")]
+        private sealed class ThingsBoardGatewayController : BaseGatewayController
+        {
+        }
     }
 }
