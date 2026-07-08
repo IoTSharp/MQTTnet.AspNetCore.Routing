@@ -4,6 +4,8 @@ using MQTTnet;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using System.Threading.Tasks;
@@ -26,6 +28,8 @@ namespace MQTTnet.AspNetCore.Routing
         }
 
         public string Template { get; }
+
+        public MqttRouteModel RouteModel { get; private protected set; } = null!;
 
         public static MqttApplicationMessageRoute Create<TPayload>(
             string template,
@@ -96,6 +100,51 @@ namespace MQTTnet.AspNetCore.Routing
             return routeSegments;
         }
 
+        private static MqttRouteModel CreateRouteModel(
+            string template,
+            RouteSegment[] segments,
+            MethodInfo handlerMethod,
+            Type? payloadType)
+        {
+            return new MqttRouteModel(
+                template,
+                MqttRouteKind.ApplicationMessage,
+                CreateSegmentDescriptors(segments),
+                CreateRouteParameterModels(segments),
+                controllerType: null,
+                actionMethod: handlerMethod,
+                payloadType: payloadType,
+                resultType: typeof(ValueTask),
+                metadata: handlerMethod.GetCustomAttributes(inherit: false).Cast<object>());
+        }
+
+        private static MqttRouteSegmentDescriptor[] CreateSegmentDescriptors(RouteSegment[] segments)
+        {
+            var descriptors = new MqttRouteSegmentDescriptor[segments.Length];
+            for (var i = 0; i < segments.Length; i++)
+            {
+                descriptors[i] = new MqttRouteSegmentDescriptor(
+                    segments[i].ParameterName == null ? segments[i].Literal : null,
+                    segments[i].ParameterName,
+                    isOptional: false,
+                    isCatchAll: false,
+                    constraints: null);
+            }
+
+            return descriptors;
+        }
+
+        private static MqttParameterModel[] CreateRouteParameterModels(RouteSegment[] segments)
+        {
+            return segments
+                .Where(segment => segment.ParameterName != null)
+                .Select(segment => new MqttParameterModel(
+                    segment.ParameterName!,
+                    typeof(string),
+                    MqttBindingSource.Route))
+                .ToArray();
+        }
+
         private static string[] Split(string value)
         {
             return value.Trim('/').Split(Separator, StringSplitOptions.RemoveEmptyEntries);
@@ -127,6 +176,7 @@ namespace MQTTnet.AspNetCore.Routing
             {
                 _jsonTypeInfo = jsonTypeInfo ?? throw new ArgumentNullException(nameof(jsonTypeInfo));
                 _handler = handler;
+                RouteModel = CreateRouteModel(template, _segments, handler.Method, typeof(TPayload));
             }
 
             public override ValueTask InvokeAsync(MqttApplicationMessageRouteContext context)
@@ -169,6 +219,7 @@ namespace MQTTnet.AspNetCore.Routing
                 : base(template)
             {
                 _handler = handler;
+                RouteModel = CreateRouteModel(template, _segments, handler.Method, payloadType: null);
             }
 
             public override ValueTask InvokeAsync(MqttApplicationMessageRouteContext context)

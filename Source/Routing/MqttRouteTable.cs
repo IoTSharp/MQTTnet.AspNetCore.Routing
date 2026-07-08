@@ -8,11 +8,19 @@ namespace MQTTnet.AspNetCore.Routing
     internal class MqttRouteTable
     {
         public MqttRouteTable(MqttRoute[] routes)
+            : this(routes, MqttRouteCatalog.Empty)
+        {
+        }
+
+        public MqttRouteTable(MqttRoute[] routes, MqttRouteCatalog catalog)
         {
             Routes = routes;
+            Catalog = catalog;
         }
 
         public MqttRoute[] Routes { get; }
+
+        public MqttRouteCatalog Catalog { get; }
 
         internal void Route(MqttRouteContext routeContext)
         {

@@ -4,6 +4,7 @@
 // Modifications Copyright (c) Atlas Lift Tech Inc. All rights reserved.
 
 using Microsoft.AspNetCore.Mvc;
+using MQTTnet.AspNetCore.Routing.Attributes;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -33,19 +34,18 @@ namespace MQTTnet.AspNetCore.Routing
         [RequiresUnreferencedCode("Assembly scanning cannot be statically analyzed. Use CreateFromControllerTypes for Native AOT applications.")]
         internal static MqttRouteTable Create(IEnumerable<Assembly> assemblies)
         {
-            var key = new Key(assemblies.OrderBy(a => a.FullName).ToArray());
+            var asm = (assemblies ?? new Assembly[] { Assembly.GetExecutingAssembly() }).ToArray();
+            var key = new Key(asm.OrderBy(a => a.FullName).ToArray());
 
             if (Cache.TryGetValue(key, out var resolvedComponents))
             {
                 return resolvedComponents;
             }
 
-            var asm = assemblies ?? new Assembly[] { Assembly.GetExecutingAssembly() };
-
             var actions = asm.SelectMany(a => a.GetTypes())
                 .SelectMany(GetControllerActions);
 
-            var routeTable = Create(actions);
+            var routeTable = Create(CreateApplicationModel(actions));
 
             Cache.TryAdd(key, routeTable);
 
@@ -58,7 +58,7 @@ namespace MQTTnet.AspNetCore.Routing
             var actions = controllerTypes
                 .SelectMany(GetControllerActions);
 
-            return Create(actions);
+            return Create(CreateApplicationModel(actions));
         }
 
         internal static MqttRouteTable CreateFromControllerType<[DynamicallyAccessedMembers(ControllerMemberTypes)] TController>()
@@ -77,13 +77,16 @@ namespace MQTTnet.AspNetCore.Routing
                     .ToArray();
             }
 
-            return Create(actions.Select(action => new MqttControllerAction(action, controllerType)));
+            return Create(CreateApplicationModel(actions.Select(action => new MqttControllerAction(action, controllerType))));
         }
 
         internal static MqttRouteTable Create(IEnumerable<MqttControllerAction> actions)
         {
-            // A future perf improvement would be to use a stringbuilder to avoid multiple string allocations
+            return Create(CreateApplicationModel(actions));
+        }
 
+        internal static MqttApplicationModel CreateApplicationModel(IEnumerable<MqttControllerAction> actions)
+        {
             var templatesByHandler = new Dictionary<MqttControllerAction, MqttControllerRouteTemplate[]>();
 
             foreach (var action in actions)
@@ -119,7 +122,7 @@ namespace MQTTnet.AspNetCore.Routing
                 templatesByHandler.Add(action, templates);
             }
 
-            return Create(templatesByHandler);
+            return CreateApplicationModel(templatesByHandler);
         }
 
         /// <summary>
@@ -128,10 +131,24 @@ namespace MQTTnet.AspNetCore.Routing
         /// <param name="templatesByHandler">Templates that should route to each handler</param>
         internal static MqttRouteTable Create(Dictionary<MqttControllerAction, MqttControllerRouteTemplate[]> templatesByHandler)
         {
-            var routes = new List<MqttRoute>();
+            return Create(CreateApplicationModel(templatesByHandler));
+        }
+
+        internal static MqttApplicationModel CreateApplicationModel(Dictionary<MqttControllerAction, MqttControllerRouteTemplate[]> templatesByHandler)
+        {
+            var routes = new List<MqttRouteModel>();
+            var actionsByController = new Dictionary<Type, List<MqttActionModel>>();
+            var controllerRoutesByController = new Dictionary<Type, List<MqttRouteModel>>();
+            var controllerRouteKeys = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var keyValuePair in templatesByHandler)
             {
+                var methodInfo = keyValuePair.Key.Method;
+                var controllerType = keyValuePair.Key.ControllerType;
+                var actionParameters = methodInfo.GetParameters()
+                    .Select(CreateActionParameterModel)
+                    .ToArray();
+                var payloadType = MqttActionModel.FindPayloadType(actionParameters);
                 var parsedTemplates = keyValuePair.Value
                     .Select(v => new ParsedMqttControllerRouteTemplate(v, TemplateParser.ParseTemplate(v.RouteTemplate)))
                     .ToArray();
@@ -141,25 +158,244 @@ namespace MQTTnet.AspNetCore.Routing
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToArray();
 
+                var actionRoutes = new List<MqttRouteModel>();
                 foreach (var parsedTemplate in parsedTemplates)
                 {
                     var unusedRouteParameterNames = allRouteParameterNames
                         .Except(GetParameterNames(parsedTemplate.ParsedRouteTemplate), StringComparer.OrdinalIgnoreCase)
                         .ToArray();
-                    var methodInfo = keyValuePair.Key.Method;
-                    var controllerType = keyValuePair.Key.ControllerType;
-                    var entry = new MqttRoute(parsedTemplate.ParsedRouteTemplate, methodInfo, unusedRouteParameterNames, controllerType);
+                    RouteTemplate parsedControllerTemplate = null;
                     if (!string.IsNullOrEmpty(parsedTemplate.RouteTemplate.ControllerTemplate))
                     {
-                        entry.ControllerTemplate = TemplateParser.ParseTemplate(parsedTemplate.RouteTemplate.ControllerTemplate);
-                        var _haveparams = entry.ControllerTemplate.Segments.Any(c => c.IsParameter);
-                        entry.HaveControllerParameter = _haveparams;
+                        parsedControllerTemplate = TemplateParser.ParseTemplate(parsedTemplate.RouteTemplate.ControllerTemplate);
+                        AddControllerRouteModel(
+                            controllerRoutesByController,
+                            controllerRouteKeys,
+                            controllerType,
+                            parsedTemplate.RouteTemplate.ControllerTemplate,
+                            parsedControllerTemplate);
                     }
-                    routes.Add(entry);
+
+                    var routeModel = new MqttRouteModel(
+                        parsedTemplate.RouteTemplate.RouteTemplate,
+                        MqttRouteKind.ControllerAction,
+                        CreateSegmentDescriptors(parsedTemplate.ParsedRouteTemplate),
+                        CreateRouteParameterModels(parsedTemplate.ParsedRouteTemplate),
+                        controllerType,
+                        methodInfo,
+                        parsedTemplate.RouteTemplate.ControllerTemplate,
+                        payloadType,
+                        methodInfo.ReturnType,
+                        metadata: methodInfo.GetCustomAttributes(inherit: true).Cast<object>(),
+                        parsedTemplate: parsedTemplate.ParsedRouteTemplate,
+                        parsedControllerTemplate: parsedControllerTemplate,
+                        unusedRouteParameterNames: unusedRouteParameterNames);
+
+                    routes.Add(routeModel);
+                    actionRoutes.Add(routeModel);
+                }
+
+                var actionModel = new MqttActionModel(
+                    controllerType,
+                    methodInfo,
+                    actionRoutes,
+                    actionParameters,
+                    payloadType,
+                    methodInfo.ReturnType,
+                    metadata: methodInfo.GetCustomAttributes(inherit: true).Cast<object>());
+
+                if (!actionsByController.TryGetValue(controllerType, out var controllerActions))
+                {
+                    controllerActions = new List<MqttActionModel>();
+                    actionsByController.Add(controllerType, controllerActions);
+                }
+
+                controllerActions.Add(actionModel);
+            }
+
+            var controllers = actionsByController
+                .OrderBy(pair => pair.Key.FullName, StringComparer.Ordinal)
+                .Select(pair => new MqttControllerModel(
+                    pair.Key,
+                    controllerRoutesByController.TryGetValue(pair.Key, out var controllerRoutes)
+                        ? controllerRoutes
+                        : Array.Empty<MqttRouteModel>(),
+                    pair.Value,
+                    metadata: pair.Key.GetCustomAttributes(inherit: true).Cast<object>()))
+                .ToArray();
+
+            return new MqttApplicationModel(controllers, routes);
+        }
+
+        internal static MqttRouteTable Create(MqttApplicationModel applicationModel)
+        {
+            var catalogBeforeSorting = new MqttRouteCatalog(applicationModel);
+            catalogBeforeSorting.ThrowIfErrors();
+
+            var routes = new List<MqttRoute>();
+
+            foreach (var routeModel in applicationModel.Routes)
+            {
+                if (routeModel.Kind != MqttRouteKind.ControllerAction)
+                {
+                    continue;
+                }
+
+                if (routeModel.ParsedTemplate == null || routeModel.ActionMethod == null || routeModel.ControllerType == null)
+                {
+                    throw new InvalidOperationException($"Controller route '{routeModel.Template}' is missing required route metadata.");
+                }
+
+                var entry = new MqttRoute(
+                    routeModel.ParsedTemplate,
+                    routeModel.ActionMethod,
+                    routeModel.UnusedRouteParameterNames,
+                    routeModel.ControllerType,
+                    routeModel);
+                if (routeModel.ParsedControllerTemplate != null)
+                {
+                    entry.ControllerTemplate = routeModel.ParsedControllerTemplate;
+                    entry.HaveControllerParameter = entry.ControllerTemplate.Segments.Any(c => c.IsParameter);
+                }
+
+                routes.Add(entry);
+            }
+
+            var sortedRoutes = routes.OrderBy(id => id, RoutePrecedence).ToArray();
+            var catalog = new MqttRouteCatalog(
+                applicationModel,
+                sortedRoutes
+                    .Where(route => route.RouteModel != null)
+                    .Select(route => route.RouteModel),
+                catalogBeforeSorting.Diagnostics);
+            return new MqttRouteTable(sortedRoutes, catalog);
+        }
+
+        private static void AddControllerRouteModel(
+            Dictionary<Type, List<MqttRouteModel>> controllerRoutesByController,
+            HashSet<string> controllerRouteKeys,
+            [DynamicallyAccessedMembers(ControllerMemberTypes)]
+            Type controllerType,
+            string controllerTemplate,
+            RouteTemplate parsedControllerTemplate)
+        {
+            var key = $"{controllerType.AssemblyQualifiedName}|{controllerTemplate}";
+            if (!controllerRouteKeys.Add(key))
+            {
+                return;
+            }
+
+            if (!controllerRoutesByController.TryGetValue(controllerType, out var controllerRoutes))
+            {
+                controllerRoutes = new List<MqttRouteModel>();
+                controllerRoutesByController.Add(controllerType, controllerRoutes);
+            }
+
+            controllerRoutes.Add(new MqttRouteModel(
+                controllerTemplate,
+                MqttRouteKind.ControllerAction,
+                CreateSegmentDescriptors(parsedControllerTemplate),
+                CreateRouteParameterModels(parsedControllerTemplate),
+                controllerType,
+                parsedTemplate: parsedControllerTemplate));
+        }
+
+        private static MqttParameterModel CreateActionParameterModel(ParameterInfo parameter)
+        {
+            var bindingSource = parameter.IsDefined(typeof(FromPayloadAttribute), inherit: false)
+                ? MqttBindingSource.Payload
+                : MqttBindingSource.Route;
+
+            TryGetParameterDefaultValue(parameter, out var defaultValue);
+            return new MqttParameterModel(
+                parameter.Name ?? "$parameter",
+                parameter.ParameterType,
+                bindingSource,
+                parameter,
+                parameter.IsOptional || parameter.HasDefaultValue,
+                defaultValue,
+                metadata: parameter.GetCustomAttributes(inherit: false).Cast<object>());
+        }
+
+        private static MqttParameterModel[] CreateRouteParameterModels(RouteTemplate routeTemplate)
+        {
+            return routeTemplate.Segments
+                .Where(segment => segment.IsParameter)
+                .Select(segment => new MqttParameterModel(
+                    segment.Value,
+                    typeof(string),
+                    MqttBindingSource.Route,
+                    isOptional: segment.IsOptional,
+                    routeConstraints: GetRouteConstraintNames(routeTemplate, segment)))
+                .ToArray();
+        }
+
+        private static MqttRouteSegmentDescriptor[] CreateSegmentDescriptors(RouteTemplate routeTemplate)
+        {
+            return routeTemplate.Segments
+                .Select(segment => new MqttRouteSegmentDescriptor(
+                    segment.IsParameter ? null : segment.Value,
+                    segment.IsParameter ? segment.Value : null,
+                    segment.IsOptional,
+                    segment.IsCatchAll,
+                    GetRouteConstraintNames(routeTemplate, segment)))
+                .ToArray();
+        }
+
+        private static string[] GetRouteConstraintNames(RouteTemplate routeTemplate, TemplateSegment segment)
+        {
+            if (!segment.IsParameter || segment.Constraints.Length == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            var rawSegments = routeTemplate.TemplateText.Split('/');
+            for (var i = 0; i < rawSegments.Length; i++)
+            {
+                var rawSegment = rawSegments[i];
+                if (rawSegment.Length < 3 || rawSegment[0] != '{' || rawSegment[rawSegment.Length - 1] != '}')
+                {
+                    continue;
+                }
+
+                var parameterText = rawSegment.Substring(1, rawSegment.Length - 2);
+                if (parameterText.StartsWith("*", StringComparison.Ordinal))
+                {
+                    parameterText = parameterText.Substring(1);
+                }
+
+                var tokens = parameterText.Split(':');
+                var parameterName = tokens[0];
+                if (parameterName.EndsWith("?", StringComparison.Ordinal))
+                {
+                    parameterName = parameterName.Substring(0, parameterName.Length - 1);
+                }
+
+                if (string.Equals(parameterName, segment.Value, StringComparison.OrdinalIgnoreCase))
+                {
+                    return tokens.Skip(1).ToArray();
                 }
             }
 
-            return new MqttRouteTable(routes.OrderBy(id => id, RoutePrecedence).ToArray());
+            return Array.Empty<string>();
+        }
+
+        private static bool TryGetParameterDefaultValue(ParameterInfo parameter, out object defaultValue)
+        {
+            if (parameter.HasDefaultValue)
+            {
+                defaultValue = parameter.DefaultValue == DBNull.Value ? null : parameter.DefaultValue;
+                return true;
+            }
+
+            if (parameter.IsOptional)
+            {
+                defaultValue = null;
+                return true;
+            }
+
+            defaultValue = null;
+            return false;
         }
 
         private static IEnumerable<MqttControllerAction> GetControllerActions(

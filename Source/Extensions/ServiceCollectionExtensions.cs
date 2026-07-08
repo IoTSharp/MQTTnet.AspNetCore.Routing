@@ -54,6 +54,7 @@ namespace MQTTnet.AspNetCore.Routing
 
             services.AddSingleton(mqttRoutingOptions);
             services.AddSingleton(_ => MqttRouteTableFactory.CreateFromControllerType(typeof(TController)));
+            services.AddSingleton(serviceProvider => serviceProvider.GetRequiredService<MqttRouteTable>().Catalog);
 
             AddMqttRoutingServices(services, mqttRoutingOptions);
             return services;
@@ -94,6 +95,7 @@ namespace MQTTnet.AspNetCore.Routing
 
                 return MqttRouteTableFactory.Create(assemblies);
             });
+            services.AddSingleton(serviceProvider => serviceProvider.GetRequiredService<MqttRouteTable>().Catalog);
             
             AddMqttRoutingServices(services, _opt);
             return services;

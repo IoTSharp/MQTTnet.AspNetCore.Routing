@@ -142,7 +142,7 @@ MQTT routing 也应保持这个分层:
 | --- | --- | --- | --- | --- |
 | 1 | `✅` | R0 边界与收敛决策 | 固定库边界、两套路由的收敛策略、上游策略、public/internal API 现状 | 无 |
 | 2 | `✅` | R1 绑定正确性 | 统一 model state,修复 Guid/enum/nullable 转换,两路径去除 payload 复制 | R0 |
-| 3 | `⬜` | R2 Application Model 与 Route Catalog | controller/action/route 元数据显式化,后续 binding/result/filter 都依赖它 | R1 |
+| 3 | `✅` | R2 Application Model 与 Route Catalog | controller/action/route 元数据显式化,后续 binding/result/filter 都依赖它 | R1 |
 | 4 | `⬜` | R3 Binding 体系 | MQTT 专用 binding source,替代零散反射绑定 | R2 |
 | 5 | `⬜` | R4 Result 体系 | MQTT result 与 return type executor | R2、R3 |
 | 6 | `⬜` | R5 Filter 管线 | 授权、资源、action、异常、result 扩展点 | R2、R3、R4 |
@@ -231,7 +231,7 @@ R0 功能清单:
 - binding failure 结果可预测、可测试。
 - JSON 反序列化路径不再无条件 `ToArray()`。
 
-### ⬜ R2:Application Model 与 Route Catalog
+### ✅ R2:Application Model 与 Route Catalog
 
 目标:把 controller/action/route 元数据显式化,启动时生成并缓存。
 

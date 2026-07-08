@@ -42,5 +42,6 @@ namespace MQTTnet.AspNetCore.Routing
         public IReadOnlyDictionary<string, object> Parameters { get; set; }
         public bool HaveControllerParameter { get; internal set; }
         public RouteTemplate ControllerTemplate { get; internal set; }
+        public MqttRouteModel RouteModel { get; internal set; }
     }
 }

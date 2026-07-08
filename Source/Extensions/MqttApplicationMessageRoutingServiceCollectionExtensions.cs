@@ -28,7 +28,9 @@ namespace MQTTnet.AspNetCore.Routing
             var builder = new MqttApplicationMessageRouteBuilder();
             configure(builder);
 
-            services.AddSingleton(builder.Build());
+            var routeTable = builder.Build();
+            services.AddSingleton(routeTable);
+            services.AddSingleton(routeTable.Catalog);
             services.AddSingleton<IMqttApplicationMessageDispatcher, MqttApplicationMessageDispatcher>();
             return services;
         }

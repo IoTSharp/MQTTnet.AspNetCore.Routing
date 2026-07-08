@@ -26,11 +26,22 @@ namespace MQTTnet.AspNetCore.Routing
             MethodInfo handler,
             string[] unusedRouteParameterNames,
             [DynamicallyAccessedMembers(ControllerMemberTypes)] Type controllerType)
+            : this(template, handler, unusedRouteParameterNames, controllerType, null)
+        {
+        }
+
+        public MqttRoute(
+            RouteTemplate template,
+            MethodInfo handler,
+            string[] unusedRouteParameterNames,
+            [DynamicallyAccessedMembers(ControllerMemberTypes)] Type controllerType,
+            MqttRouteModel routeModel)
         {
             Template = template;
             UnusedRouteParameterNames = unusedRouteParameterNames;
             Handler = handler;
             ControllerType = controllerType;
+            RouteModel = routeModel;
         }
 
         public RouteTemplate Template { get; }
@@ -40,6 +51,7 @@ namespace MQTTnet.AspNetCore.Routing
         public Type ControllerType { get; }
         public RouteTemplate ControllerTemplate { get; internal set; }
         public bool HaveControllerParameter { get; internal set; }
+        public MqttRouteModel RouteModel { get; }
 
         internal void Match(MqttRouteContext context)
         {
@@ -147,6 +159,7 @@ namespace MQTTnet.AspNetCore.Routing
                 context.ControllerType = ControllerType;
                 context.HaveControllerParameter = HaveControllerParameter;
                 context.ControllerTemplate = ControllerTemplate;
+                context.RouteModel = RouteModel;
             }
         }
     }
