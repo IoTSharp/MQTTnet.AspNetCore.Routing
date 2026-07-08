@@ -98,6 +98,18 @@ namespace MQTTnet.AspNetCore.Routing
                     builder.Append(GetFriendlyName(route.PayloadType));
                 }
 
+                if (!string.IsNullOrWhiteSpace(route.DeclaredContentType))
+                {
+                    builder.Append(" contentType=");
+                    builder.Append(route.DeclaredContentType);
+                }
+
+                if (!string.IsNullOrWhiteSpace(route.DeclaredPayloadFormatterName))
+                {
+                    builder.Append(" formatter=");
+                    builder.Append(route.DeclaredPayloadFormatterName);
+                }
+
                 if (route.ResultType != null)
                 {
                     builder.Append(" result=");
@@ -146,6 +158,13 @@ namespace MQTTnet.AspNetCore.Routing
                 builder.Append(GetFriendlyName(parameter.ParameterType));
                 builder.Append(' ');
                 builder.Append(parameter.BindingSource);
+
+                if (!string.IsNullOrWhiteSpace(parameter.BindingName)
+                    && !string.Equals(parameter.BindingName, parameter.Name, StringComparison.Ordinal))
+                {
+                    builder.Append(" name=");
+                    builder.Append(parameter.BindingName);
+                }
 
                 if (parameter.RouteConstraints.Count > 0)
                 {

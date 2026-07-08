@@ -96,8 +96,8 @@ namespace MQTTnet.AspNetCore.Routing
                 actionContext,
                 parameter.ParameterType,
                 jsonTypeInfo,
-                attribute?.ContentType,
-                attribute?.FormatterName);
+                ResolvePayloadContentType(attribute?.ContentType, actionContext),
+                ResolvePayloadFormatterName(attribute?.FormatterName, actionContext));
 
             var formatter = _options.InputFormatters.FirstOrDefault(item => item.CanRead(formatterContext));
             if (formatter == null)
@@ -462,6 +462,41 @@ namespace MQTTnet.AspNetCore.Routing
             {
                 return null;
             }
+        }
+
+        private string? ResolvePayloadContentType(string? declaredContentType, MqttActionContext actionContext)
+        {
+            if (!string.IsNullOrWhiteSpace(declaredContentType))
+            {
+                return declaredContentType;
+            }
+
+            if (!string.IsNullOrWhiteSpace(actionContext.RequestContext.ContentType))
+            {
+                return actionContext.RequestContext.ContentType;
+            }
+
+            if (!string.IsNullOrWhiteSpace(actionContext.RouteContext.MatchedRoute?.DeclaredContentType))
+            {
+                return actionContext.RouteContext.MatchedRoute.DeclaredContentType;
+            }
+
+            return _options.DefaultPayloadContentType;
+        }
+
+        private string? ResolvePayloadFormatterName(string? declaredFormatterName, MqttActionContext actionContext)
+        {
+            if (!string.IsNullOrWhiteSpace(declaredFormatterName))
+            {
+                return declaredFormatterName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(actionContext.RouteContext.MatchedRoute?.DeclaredPayloadFormatterName))
+            {
+                return actionContext.RouteContext.MatchedRoute.DeclaredPayloadFormatterName;
+            }
+
+            return _options.DefaultPayloadFormatterName;
         }
 
         private static string ResolveKey(string? declaredName, ParameterInfo parameter)

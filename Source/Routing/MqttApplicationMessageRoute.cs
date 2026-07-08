@@ -104,7 +104,9 @@ namespace MQTTnet.AspNetCore.Routing
             string template,
             RouteSegment[] segments,
             MethodInfo handlerMethod,
-            Type? payloadType)
+            Type? payloadType,
+            string? declaredContentType = null,
+            string? declaredPayloadFormatterName = null)
         {
             return new MqttRouteModel(
                 template,
@@ -115,6 +117,8 @@ namespace MQTTnet.AspNetCore.Routing
                 actionMethod: handlerMethod,
                 payloadType: payloadType,
                 resultType: typeof(ValueTask),
+                declaredContentType: declaredContentType,
+                declaredPayloadFormatterName: declaredPayloadFormatterName,
                 metadata: handlerMethod.GetCustomAttributes(inherit: false).Cast<object>());
         }
 
@@ -176,7 +180,13 @@ namespace MQTTnet.AspNetCore.Routing
             {
                 _jsonTypeInfo = jsonTypeInfo ?? throw new ArgumentNullException(nameof(jsonTypeInfo));
                 _handler = handler;
-                RouteModel = CreateRouteModel(template, _segments, handler.Method, typeof(TPayload));
+                RouteModel = CreateRouteModel(
+                    template,
+                    _segments,
+                    handler.Method,
+                    typeof(TPayload),
+                    "application/json",
+                    "json");
             }
 
             public override ValueTask InvokeAsync(MqttApplicationMessageRouteContext context)

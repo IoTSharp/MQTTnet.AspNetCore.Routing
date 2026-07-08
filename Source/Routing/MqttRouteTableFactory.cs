@@ -151,7 +151,10 @@ namespace MQTTnet.AspNetCore.Routing
                 var actionParameters = methodInfo.GetParameters()
                     .Select(CreateActionParameterModel)
                     .ToArray();
-                var payloadType = MqttActionModel.FindPayloadType(actionParameters);
+                var payloadParameter = MqttActionModel.FindPayloadParameter(actionParameters);
+                var payloadType = payloadParameter?.ParameterType;
+                var declaredContentType = payloadParameter?.DeclaredContentType;
+                var declaredFormatterName = payloadParameter?.FormatterName;
                 var parsedTemplates = keyValuePair.Value
                     .Select(v => new ParsedMqttControllerRouteTemplate(v, TemplateParser.ParseTemplate(v.RouteTemplate)))
                     .ToArray();
@@ -189,6 +192,8 @@ namespace MQTTnet.AspNetCore.Routing
                         parsedTemplate.RouteTemplate.ControllerTemplate,
                         payloadType,
                         methodInfo.ReturnType,
+                        declaredContentType,
+                        declaredFormatterName,
                         metadata: methodInfo.GetCustomAttributes(inherit: true).Cast<object>(),
                         parsedTemplate: parsedTemplate.ParsedRouteTemplate,
                         parsedControllerTemplate: parsedControllerTemplate,
@@ -205,6 +210,8 @@ namespace MQTTnet.AspNetCore.Routing
                     actionParameters,
                     payloadType,
                     methodInfo.ReturnType,
+                    declaredContentType,
+                    declaredFormatterName,
                     metadata: methodInfo.GetCustomAttributes(inherit: true).Cast<object>());
 
                 if (!actionsByController.TryGetValue(controllerType, out var controllerActions))
@@ -306,6 +313,7 @@ namespace MQTTnet.AspNetCore.Routing
         private static MqttParameterModel CreateActionParameterModel(ParameterInfo parameter)
         {
             var bindingSource = GetActionParameterBindingSource(parameter);
+            var payloadAttribute = parameter.GetCustomAttribute<FromMqttPayloadAttribute>(inherit: false);
 
             TryGetParameterDefaultValue(parameter, out var defaultValue);
             return new MqttParameterModel(
@@ -315,7 +323,39 @@ namespace MQTTnet.AspNetCore.Routing
                 parameter,
                 parameter.IsOptional || parameter.HasDefaultValue,
                 defaultValue,
-                metadata: parameter.GetCustomAttributes(inherit: false).Cast<object>());
+                metadata: parameter.GetCustomAttributes(inherit: false).Cast<object>(),
+                bindingName: GetActionParameterBindingName(parameter, bindingSource),
+                declaredContentType: payloadAttribute?.ContentType,
+                formatterName: payloadAttribute?.FormatterName);
+        }
+
+        private static string GetActionParameterBindingName(ParameterInfo parameter, MqttBindingSource bindingSource)
+        {
+            switch (bindingSource)
+            {
+                case MqttBindingSource.Route:
+                    return parameter.GetCustomAttribute<FromMqttRouteAttribute>(inherit: false)?.Name
+                        ?? parameter.Name
+                        ?? "$parameter";
+                case MqttBindingSource.Session:
+                    return parameter.GetCustomAttribute<FromMqttSessionAttribute>(inherit: false)?.Key
+                        ?? parameter.Name
+                        ?? "$parameter";
+                case MqttBindingSource.Client:
+                    return parameter.GetCustomAttribute<FromMqttClientAttribute>(inherit: false)?.Name
+                        ?? "clientId";
+                case MqttBindingSource.UserProperty:
+                    return parameter.GetCustomAttribute<FromMqttUserPropertyAttribute>(inherit: false)?.Name
+                        ?? parameter.Name
+                        ?? "$parameter";
+                case MqttBindingSource.Payload:
+                    return "$payload";
+                case MqttBindingSource.Context:
+                case MqttBindingSource.Services:
+                case MqttBindingSource.Unknown:
+                default:
+                    return parameter.Name ?? "$parameter";
+            }
         }
 
         private static MqttBindingSource GetActionParameterBindingSource(ParameterInfo parameter)

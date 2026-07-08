@@ -28,6 +28,8 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             var payloadParameter = telemetryAction.Parameters.Single(parameter => parameter.Name == "payload");
             var deviceIdParameter = telemetryRoute.RouteParameters.Single(parameter => parameter.Name == "deviceId");
             var r3Action = controller.Actions.Single(action => action.Name == nameof(CatalogController.R3Binding));
+            var r3Route = catalog.Routes.Single(route => route.Template == "catalog/devices/{deviceId:guid}/r3");
+            var r3PayloadParameter = r3Action.Parameters.Single(parameter => parameter.Name == "payload");
             var snapshot = catalog.CreateSnapshot();
 
             Assert.IsFalse(catalog.HasErrors);
@@ -44,9 +46,19 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.AreEqual(MqttBindingSource.UserProperty, r3Action.Parameters.Single(parameter => parameter.Name == "traceId").BindingSource);
             Assert.AreEqual(MqttBindingSource.Session, r3Action.Parameters.Single(parameter => parameter.Name == "tenant").BindingSource);
             Assert.AreEqual(MqttBindingSource.Context, r3Action.Parameters.Single(parameter => parameter.Name == "requestContext").BindingSource);
+            Assert.AreEqual("deviceId", r3Action.Parameters.Single(parameter => parameter.Name == "deviceId").BindingName);
+            Assert.AreEqual("trace-id", r3Action.Parameters.Single(parameter => parameter.Name == "traceId").BindingName);
+            Assert.AreEqual("application/vnd.catalog+json", r3Action.DeclaredContentType);
+            Assert.AreEqual("json", r3Action.DeclaredPayloadFormatterName);
+            Assert.AreEqual("application/vnd.catalog+json", r3Route.DeclaredContentType);
+            Assert.AreEqual("json", r3Route.DeclaredPayloadFormatterName);
+            Assert.AreEqual("application/vnd.catalog+json", r3PayloadParameter.DeclaredContentType);
+            Assert.AreEqual("json", r3PayloadParameter.FormatterName);
             CollectionAssert.Contains(deviceIdParameter.RouteConstraints.ToArray(), "guid");
             StringAssert.Contains(snapshot, "ControllerAction catalog/devices/{deviceId:guid}/telemetry");
             StringAssert.Contains(snapshot, "payload=CatalogPayload");
+            StringAssert.Contains(snapshot, "contentType=application/vnd.catalog+json");
+            StringAssert.Contains(snapshot, "formatter=json");
         }
 
         [TestMethod]
@@ -76,10 +88,13 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.AreEqual(2, catalog.Routes.Count);
             Assert.AreEqual(MqttRouteKind.ApplicationMessage, telemetryRoute.Kind);
             Assert.AreEqual(typeof(CatalogPayload), telemetryRoute.PayloadType);
+            Assert.AreEqual("application/json", telemetryRoute.DeclaredContentType);
+            Assert.AreEqual("json", telemetryRoute.DeclaredPayloadFormatterName);
             Assert.AreEqual("deviceId", deviceIdParameter.Name);
             Assert.AreEqual(MqttBindingSource.Route, deviceIdParameter.BindingSource);
             Assert.IsNotNull(telemetryRoute.ActionMethod);
             StringAssert.Contains(snapshot, "ApplicationMessage catalog/slim/{deviceId}/telemetry");
+            StringAssert.Contains(snapshot, "contentType=application/json formatter=json");
         }
 
         [TestMethod]
@@ -150,7 +165,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             [MqttRoute("{deviceId:guid}/r3")]
             public void R3Binding(
                 [FromMqttRoute("deviceId")] Guid deviceId,
-                [FromMqttPayload] CatalogPayload payload,
+                [FromMqttPayload("application/vnd.catalog+json", FormatterName = "json")] CatalogPayload payload,
                 [FromMqttClient] string clientId,
                 [FromMqttUserProperty("trace-id")] string traceId,
                 [FromMqttSession("tenant")] string tenant,

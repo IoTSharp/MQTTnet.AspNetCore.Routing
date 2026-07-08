@@ -130,6 +130,38 @@ namespace MQTTnet.AspNetCore.Routing
             return opt;
         }
 
+        /// <summary>
+        /// 配置没有显式声明时使用的默认 MQTT payload content type。
+        /// </summary>
+        /// <param name="opt">MQTT routing 配置。</param>
+        /// <param name="contentType">默认 content type；传入 <c>null</c> 可清除默认值。</param>
+        public static MqttRoutingOptions WithDefaultPayloadContentType(this MqttRoutingOptions opt, string? contentType)
+        {
+            if (opt == null)
+            {
+                throw new ArgumentNullException(nameof(opt));
+            }
+
+            opt.DefaultPayloadContentType = contentType;
+            return opt;
+        }
+
+        /// <summary>
+        /// 配置没有显式声明时使用的默认 MQTT payload formatter 名称。
+        /// </summary>
+        /// <param name="opt">MQTT routing 配置。</param>
+        /// <param name="formatterName">默认 formatter 名称；传入 <c>null</c> 可清除默认值。</param>
+        public static MqttRoutingOptions WithDefaultPayloadFormatter(this MqttRoutingOptions opt, string? formatterName)
+        {
+            if (opt == null)
+            {
+                throw new ArgumentNullException(nameof(opt));
+            }
+
+            opt.DefaultPayloadFormatterName = formatterName;
+            return opt;
+        }
+
         public static MqttRoutingOptions FromAssemblies(this MqttRoutingOptions opt, params Assembly[] assemblies)
         {
             opt.FromAssemblies = assemblies;

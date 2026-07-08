@@ -30,6 +30,7 @@ namespace MQTTnet.AspNetCore.Routing
             Type? payloadType = null,
             Type? resultType = null,
             string? declaredContentType = null,
+            string? declaredPayloadFormatterName = null,
             IEnumerable<MqttFilterModel>? filters = null,
             IEnumerable<object>? metadata = null,
             RouteTemplate? parsedTemplate = null,
@@ -46,6 +47,7 @@ namespace MQTTnet.AspNetCore.Routing
             PayloadType = payloadType;
             ResultType = resultType;
             DeclaredContentType = declaredContentType;
+            DeclaredPayloadFormatterName = declaredPayloadFormatterName;
             Filters = MqttModelCollection.ToReadOnlyList(filters);
             Metadata = MqttModelCollection.ToReadOnlyList(metadata);
             ParsedTemplate = parsedTemplate;
@@ -98,6 +100,11 @@ namespace MQTTnet.AspNetCore.Routing
         /// route 声明的内容类型；当前没有声明时为空。
         /// </summary>
         public string? DeclaredContentType { get; }
+
+        /// <summary>
+        /// route 声明的 payload formatter 名称；当前没有声明时为空。
+        /// </summary>
+        public string? DeclaredPayloadFormatterName { get; }
 
         /// <summary>
         /// route 关联的 filter 元数据。

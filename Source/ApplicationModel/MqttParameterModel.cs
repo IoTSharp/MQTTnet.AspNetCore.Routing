@@ -19,7 +19,10 @@ namespace MQTTnet.AspNetCore.Routing
             bool isOptional = false,
             object? defaultValue = null,
             IEnumerable<string>? routeConstraints = null,
-            IEnumerable<object>? metadata = null)
+            IEnumerable<object>? metadata = null,
+            string? bindingName = null,
+            string? declaredContentType = null,
+            string? formatterName = null)
         {
             Name = name ?? throw new ArgumentNullException(nameof(name));
             ParameterType = parameterType ?? throw new ArgumentNullException(nameof(parameterType));
@@ -29,6 +32,9 @@ namespace MQTTnet.AspNetCore.Routing
             DefaultValue = defaultValue;
             RouteConstraints = MqttModelCollection.ToReadOnlyList(routeConstraints);
             Metadata = MqttModelCollection.ToReadOnlyList(metadata);
+            BindingName = bindingName;
+            DeclaredContentType = declaredContentType;
+            FormatterName = formatterName;
         }
 
         /// <summary>
@@ -52,6 +58,11 @@ namespace MQTTnet.AspNetCore.Routing
         public MqttBindingSource BindingSource { get; }
 
         /// <summary>
+        /// 参数绑定使用的外部名称，例如 route value、session key、client 字段或 user property 名称。
+        /// </summary>
+        public string? BindingName { get; }
+
+        /// <summary>
         /// 参数是否可选。
         /// </summary>
         public bool IsOptional { get; }
@@ -65,6 +76,16 @@ namespace MQTTnet.AspNetCore.Routing
         /// route 模板参数声明的约束名称。
         /// </summary>
         public IReadOnlyList<string> RouteConstraints { get; }
+
+        /// <summary>
+        /// payload 参数声明的 content type；非 payload 参数为空。
+        /// </summary>
+        public string? DeclaredContentType { get; }
+
+        /// <summary>
+        /// payload 参数声明的 formatter 名称；非 payload 参数为空。
+        /// </summary>
+        public string? FormatterName { get; }
 
         /// <summary>
         /// 参数上的自定义元数据。

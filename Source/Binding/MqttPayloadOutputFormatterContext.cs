@@ -32,8 +32,10 @@ namespace MQTTnet.AspNetCore.Routing
             Value = value;
             PayloadType = payloadType ?? throw new ArgumentNullException(nameof(payloadType));
             JsonTypeInfo = jsonTypeInfo;
-            ContentType = contentType;
-            FormatterName = formatterName;
+            ContentType = contentType
+                ?? actionContext.RouteContext.MatchedRoute?.DeclaredContentType;
+            FormatterName = formatterName
+                ?? actionContext.RouteContext.MatchedRoute?.DeclaredPayloadFormatterName;
         }
 
         /// <summary>

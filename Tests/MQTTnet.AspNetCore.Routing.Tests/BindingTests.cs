@@ -80,6 +80,49 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.IsTrue(errors.Any(error => error.ErrorCode == MqttBindingErrorCode.MissingSessionItem));
         }
 
+        [TestMethod]
+        public async Task Binder_UsesDefaultPayloadFormatterOptions()
+        {
+            var actionContext = CreateActionContext(MqttMessage("binding/text", "hello"));
+            var options = new MqttRoutingOptions()
+                .WithDefaultPayloadContentType("text/plain")
+                .WithDefaultPayloadFormatter("text");
+            options.InputFormatters.Add(new TextPayloadInputFormatter("text/plain"));
+            var binder = new MqttActionParameterBinder(options);
+
+            var values = await binder.BindAsync(
+                Parameters(nameof(BindingTarget.TextPayload)),
+                actionContext);
+
+            Assert.AreEqual("hello", values[0]);
+        }
+
+        [TestMethod]
+        public async Task Binder_PrefersMqttContentTypeOverRouteMetadata()
+        {
+            var routeModel = new MqttRouteModel(
+                "binding/text",
+                MqttRouteKind.ControllerAction,
+                Array.Empty<MqttRouteSegmentDescriptor>(),
+                payloadType: typeof(string),
+                declaredContentType: "text/plain",
+                declaredPayloadFormatterName: "text");
+            var actionContext = CreateActionContext(
+                MqttMessage("binding/text", "from-message", contentType: "application/vnd.message+text"),
+                routeModel: routeModel);
+            var options = new MqttRoutingOptions()
+                .WithDefaultPayloadContentType("application/octet-stream")
+                .WithDefaultPayloadFormatter("default");
+            options.InputFormatters.Add(new TextPayloadInputFormatter("application/vnd.message+text", "text"));
+            var binder = new MqttActionParameterBinder(options);
+
+            var values = await binder.BindAsync(
+                Parameters(nameof(BindingTarget.TextPayload)),
+                actionContext);
+
+            Assert.AreEqual("from-message", values[0]);
+        }
+
         private static MqttActionParameterBinder CreateBinder()
         {
             var options = new MqttRoutingOptions()
@@ -91,7 +134,8 @@ namespace MQTTnet.AspNetCore.Routing.Tests
 
         private static MqttActionContext CreateActionContext(
             MqttApplicationMessage message,
-            IDictionary? sessionItems = null)
+            IDictionary? sessionItems = null,
+            MqttRouteModel? routeModel = null)
         {
             var services = new ServiceCollection().BuildServiceProvider();
             var requestContext = new MqttRequestContext(
@@ -99,7 +143,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                 "binding-client",
                 sessionItems);
             var routeContext = new MqttRouteContext(
-                null,
+                routeModel,
                 new Dictionary<string, object?>
                 {
                     ["deviceId"] = "binding-device"
@@ -124,10 +168,24 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             string payload,
             params (string Name, string Value)[] userProperties)
         {
+            return MqttMessage(topic, payload, null, userProperties);
+        }
+
+        private static MqttApplicationMessage MqttMessage(
+            string topic,
+            string payload,
+            string? contentType,
+            params (string Name, string Value)[] userProperties)
+        {
             var builder = new MqttApplicationMessageBuilder()
                 .WithTopic(topic)
                 .WithPayload(payload)
                 .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtMostOnce);
+
+            if (!string.IsNullOrWhiteSpace(contentType))
+            {
+                builder.WithContentType(contentType);
+            }
 
             foreach (var userProperty in userProperties)
             {
@@ -179,6 +237,36 @@ namespace MQTTnet.AspNetCore.Routing.Tests
 
             public static void MissingSessionItem([FromMqttSession("tenant")] string tenant)
             {
+            }
+
+            public static void TextPayload([FromMqttPayload] string payload)
+            {
+            }
+        }
+
+        private sealed class TextPayloadInputFormatter : IMqttPayloadInputFormatter
+        {
+            private readonly string _contentType;
+            private readonly string? _formatterName;
+
+            public TextPayloadInputFormatter(string contentType, string? formatterName = "text")
+            {
+                _contentType = contentType;
+                _formatterName = formatterName;
+            }
+
+            public string Name => "text";
+
+            public bool CanRead(MqttPayloadInputFormatterContext context)
+            {
+                return context.ModelType == typeof(string)
+                    && string.Equals(context.ContentType, _contentType, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(context.FormatterName, _formatterName, StringComparison.OrdinalIgnoreCase);
+            }
+
+            public ValueTask<object?> ReadAsync(MqttPayloadInputFormatterContext context)
+            {
+                return ValueTask.FromResult<object?>(Encoding.UTF8.GetString(context.Payload.ToArray()));
             }
         }
     }

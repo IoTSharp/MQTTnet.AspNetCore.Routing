@@ -20,6 +20,7 @@ namespace MQTTnet.AspNetCore.Routing
             Type? payloadType = null,
             Type? resultType = null,
             string? declaredContentType = null,
+            string? declaredPayloadFormatterName = null,
             IEnumerable<MqttFilterModel>? filters = null,
             IEnumerable<object>? metadata = null)
         {
@@ -31,6 +32,7 @@ namespace MQTTnet.AspNetCore.Routing
             PayloadType = payloadType;
             ResultType = resultType ?? actionMethod.ReturnType;
             DeclaredContentType = declaredContentType;
+            DeclaredPayloadFormatterName = declaredPayloadFormatterName;
             Filters = MqttModelCollection.ToReadOnlyList(filters);
             Metadata = MqttModelCollection.ToReadOnlyList(metadata);
         }
@@ -76,6 +78,11 @@ namespace MQTTnet.AspNetCore.Routing
         public string? DeclaredContentType { get; }
 
         /// <summary>
+        /// action 声明的 payload formatter 名称；当前没有声明时为空。
+        /// </summary>
+        public string? DeclaredPayloadFormatterName { get; }
+
+        /// <summary>
         /// action 关联的 filter 元数据。
         /// </summary>
         public IReadOnlyList<MqttFilterModel> Filters { get; }
@@ -87,7 +94,12 @@ namespace MQTTnet.AspNetCore.Routing
 
         internal static Type? FindPayloadType(IEnumerable<MqttParameterModel> parameters)
         {
-            return parameters.FirstOrDefault(p => p.BindingSource == MqttBindingSource.Payload)?.ParameterType;
+            return FindPayloadParameter(parameters)?.ParameterType;
+        }
+
+        internal static MqttParameterModel? FindPayloadParameter(IEnumerable<MqttParameterModel> parameters)
+        {
+            return parameters.FirstOrDefault(p => p.BindingSource == MqttBindingSource.Payload);
         }
     }
 }

@@ -33,5 +33,15 @@ public class MqttRoutingOptions
     /// </summary>
     public IList<IMqttPayloadOutputFormatter> OutputFormatters { get; }
 
+    /// <summary>
+    /// 当参数、MQTT v5 content type 和 route metadata 都未声明内容类型时使用的默认 payload content type。
+    /// </summary>
+    public string DefaultPayloadContentType { get; set; }
+
+    /// <summary>
+    /// 当参数和 route metadata 都未声明 formatter 名称时使用的默认 payload formatter 名称。
+    /// </summary>
+    public string DefaultPayloadFormatterName { get; set; }
+
  
 }
