@@ -131,8 +131,31 @@ namespace MQTTnet.AspNetCore.Routing
 
             public override ValueTask InvokeAsync(MqttApplicationMessageRouteContext context)
             {
-                var payload = JsonSerializer.Deserialize(context.Message.Payload.ToArray(), _jsonTypeInfo)
-                    ?? throw new JsonException("MQTT payload is required.");
+                TPayload? payload;
+                try
+                {
+                    payload = MqttJsonPayloadSerializer.Deserialize(context.Message.Payload, _jsonTypeInfo);
+                }
+                catch (JsonException ex)
+                {
+                    context.ModelState.AddModelError(
+                        "$payload",
+                        MqttBindingErrorCode.PayloadDeserializationFailed,
+                        "MQTT payload could not be deserialized.");
+                    throw new MqttBindingException(
+                        context.ModelState,
+                        "MQTT payload could not be deserialized.",
+                        ex);
+                }
+
+                if (payload == null)
+                {
+                    context.ModelState.AddModelError(
+                        "$payload",
+                        MqttBindingErrorCode.PayloadDeserializationFailed,
+                        "MQTT payload is required.");
+                    throw new MqttBindingException(context.ModelState, "MQTT payload is required.");
+                }
 
                 return _handler(context, payload);
             }

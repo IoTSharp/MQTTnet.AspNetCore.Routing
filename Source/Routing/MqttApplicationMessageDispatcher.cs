@@ -1,6 +1,7 @@
 // Copyright (c) Atlas Lift Tech Inc. All rights reserved.
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,13 +13,16 @@ namespace MQTTnet.AspNetCore.Routing
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly MqttApplicationMessageRouteTable _routeTable;
+        private readonly ILogger<MqttApplicationMessageDispatcher>? _logger;
 
         public MqttApplicationMessageDispatcher(
             IServiceScopeFactory scopeFactory,
-            MqttApplicationMessageRouteTable routeTable)
+            MqttApplicationMessageRouteTable routeTable,
+            ILogger<MqttApplicationMessageDispatcher>? logger = null)
         {
             _scopeFactory = scopeFactory;
             _routeTable = routeTable;
+            _logger = logger;
         }
 
         public async Task<MqttApplicationMessageDispatchResult> DispatchAsync(
@@ -39,8 +43,21 @@ namespace MQTTnet.AspNetCore.Routing
                 routeValues,
                 cancellationToken);
 
-            await route.InvokeAsync(context).ConfigureAwait(false);
-            return new MqttApplicationMessageDispatchResult(true);
+            try
+            {
+                await route.InvokeAsync(context).ConfigureAwait(false);
+                return new MqttApplicationMessageDispatchResult(true, context.ModelState);
+            }
+            catch (MqttBindingException ex)
+            {
+                _logger?.LogDebug(
+                    ex,
+                    "MQTT message binding failed for topic '{Topic}' with {ErrorCount} model state error(s).",
+                    applicationMessage.Topic,
+                    ex.ModelState.ErrorCount);
+
+                return new MqttApplicationMessageDispatchResult(false, ex.ModelState);
+            }
         }
 
         public async Task<MqttApplicationMessageDispatchResult> DispatchAsync(

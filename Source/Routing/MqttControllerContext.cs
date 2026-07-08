@@ -8,5 +8,9 @@ namespace MQTTnet.AspNetCore.Routing
     {
         public InterceptingPublishEventArgs MqttContext { get; set; }
         public MqttServer MqttServer { get; set; }
+        /// <summary>
+        /// 当前 controller action 绑定过程产生的错误。
+        /// </summary>
+        public MqttModelStateDictionary ModelState { get; } = new MqttModelStateDictionary();
     }
 }

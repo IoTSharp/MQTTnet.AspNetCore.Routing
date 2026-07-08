@@ -56,6 +56,44 @@ namespace MQTTnet.AspNetCore.Routing.Tests
         }
 
         [TestMethod]
+        public async Task FullRouting_ServerMode_BindsGuidEnumAndNullableRouteValues()
+        {
+            var recorder = new FullRoutingRecorder();
+            using var services = BuildFullRoutingServices(recorder);
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-typed-publisher");
+            var deviceId = Guid.Parse("4d218938-4175-4a70-99b2-d63896302244");
+
+            var withoutRevision = await publisher.PublishStringAsync($"full/devices/{deviceId:D}/mode/online", "{}");
+            var withRevision = await publisher.PublishStringAsync($"full/devices/{deviceId:D}/mode/offline/42", "{}");
+
+            Assert.IsTrue(withoutRevision.IsSuccess, withoutRevision.ReasonString);
+            Assert.IsTrue(withRevision.IsSuccess, withRevision.ReasonString);
+
+            var typed = await recorder.ExpectAsync("typed-route");
+            var typedWithRevision = await recorder.ExpectAsync("typed-route-revision");
+
+            Assert.AreEqual(deviceId.ToString("D"), typed.DeviceId);
+            Assert.AreEqual("Online:<null>", typed.PayloadText);
+            Assert.AreEqual(deviceId.ToString("D"), typedWithRevision.DeviceId);
+            Assert.AreEqual("Offline:42", typedWithRevision.PayloadText);
+        }
+
+        [TestMethod]
+        public async Task FullRouting_ServerMode_RejectsInvalidGuidRouteValue()
+        {
+            var recorder = new FullRoutingRecorder();
+            using var services = BuildFullRoutingServices(recorder);
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-invalid-publisher");
+
+            await publisher.PublishStringAsync("full/devices/not-a-guid/mode/online", "{}");
+
+            Assert.IsFalse(recorder.TryGet("typed-route", out _));
+            Assert.IsFalse(recorder.TryGet("wildcard", out _));
+        }
+
+        [TestMethod]
         public async Task SlimRouting_ServerMode_RoutesInterceptedPublishesByTopic()
         {
             var recorder = new SlimRoutingRecorder();
@@ -169,6 +207,59 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.AreEqual("direct-client", pingRecord.ClientId);
         }
 
+        [TestMethod]
+        public async Task SlimRouting_DirectMode_BindsGuidAndEnumRouteValues()
+        {
+            var recorder = new SlimRoutingRecorder();
+            using var services = BuildSlimRoutingServices(recorder);
+            var dispatcher = services.GetRequiredService<IMqttApplicationMessageDispatcher>();
+            var deviceId = Guid.Parse("20e2def2-53df-49c7-91c5-a2f3df8f8d8b");
+
+            var result = await dispatcher.DispatchAsync(
+                MqttMessage($"slim/devices/{deviceId:D}/mode/online", "ignored"),
+                "direct-client");
+
+            Assert.IsTrue(result.IsHandled);
+            Assert.IsTrue(result.ModelState.IsValid);
+
+            var typedRecord = await recorder.ExpectAsync("typed");
+            Assert.AreEqual(deviceId.ToString("D"), typedRecord.DeviceId);
+            Assert.AreEqual("Online", typedRecord.PayloadText);
+            Assert.AreEqual("direct-client", typedRecord.ClientId);
+        }
+
+        [TestMethod]
+        public async Task SlimRouting_DirectMode_ReturnsModelStateForInvalidRouteValue()
+        {
+            var recorder = new SlimRoutingRecorder();
+            using var services = BuildSlimRoutingServices(recorder);
+            var dispatcher = services.GetRequiredService<IMqttApplicationMessageDispatcher>();
+
+            var result = await dispatcher.DispatchAsync(
+                MqttMessage("slim/devices/not-a-guid/mode/online", "ignored"),
+                "direct-client");
+
+            Assert.IsFalse(result.IsHandled);
+            AssertModelStateError(result.ModelState, "deviceId", MqttBindingErrorCode.TypeConversionFailed);
+            Assert.IsFalse(recorder.TryGet("typed", out _));
+        }
+
+        [TestMethod]
+        public async Task SlimRouting_DirectMode_ReturnsModelStateForInvalidJsonPayload()
+        {
+            var recorder = new SlimRoutingRecorder();
+            using var services = BuildSlimRoutingServices(recorder);
+            var dispatcher = services.GetRequiredService<IMqttApplicationMessageDispatcher>();
+
+            var result = await dispatcher.DispatchAsync(
+                MqttMessage("slim/devices/boiler/telemetry", "{"),
+                "direct-client");
+
+            Assert.IsFalse(result.IsHandled);
+            AssertModelStateError(result.ModelState, "$payload", MqttBindingErrorCode.PayloadDeserializationFailed);
+            Assert.IsFalse(recorder.TryGet("telemetry", out _));
+        }
+
         private static ServiceProvider BuildFullRoutingServices(FullRoutingRecorder recorder)
         {
             return new ServiceCollection()
@@ -221,8 +312,37 @@ namespace MQTTnet.AspNetCore.Routing.Tests
 
                             return ValueTask.CompletedTask;
                         });
+
+                    routes.Map(
+                        "slim/devices/{deviceId}/mode/{mode}",
+                        static context =>
+                        {
+                            var recorder = context.Services.GetRequiredService<SlimRoutingRecorder>();
+                            var deviceId = context.GetRouteValue<Guid>("deviceId");
+                            var mode = context.GetRouteValue<DeviceMode>("mode");
+                            recorder.Record(
+                                "typed",
+                                new SlimRouteRecord(
+                                    deviceId.ToString("D"),
+                                    null,
+                                    mode.ToString(),
+                                    context.ClientId,
+                                    context.Message.Topic));
+
+                            return ValueTask.CompletedTask;
+                        });
                 })
                 .BuildServiceProvider();
+        }
+
+        private static void AssertModelStateError(
+            MqttModelStateDictionary modelState,
+            string key,
+            MqttBindingErrorCode errorCode)
+        {
+            Assert.IsFalse(modelState.IsValid);
+            Assert.IsTrue(modelState.TryGetErrors(key, out var errors));
+            Assert.IsTrue(errors.Any(error => error.ErrorCode == errorCode));
         }
 
         private static MqttApplicationMessage MqttMessage(string topic, string payload)
@@ -280,6 +400,22 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                         deviceId.ToString(),
                         payload.Temperature,
                         null,
+                        ClientId,
+                        Message.Topic,
+                        Server));
+
+                return Ok();
+            }
+
+            [MqttRoute("{deviceId}/mode/{mode}/{revision:long?}")]
+            public Task TypedRoute(Guid deviceId, DeviceMode mode, long? revision)
+            {
+                _recorder.Record(
+                    revision.HasValue ? "typed-route-revision" : "typed-route",
+                    new FullRouteRecord(
+                        deviceId.ToString("D"),
+                        null,
+                        $"{mode}:{(revision.HasValue ? revision.Value.ToString() : "<null>")}",
                         ClientId,
                         Message.Topic,
                         Server));
@@ -409,6 +545,12 @@ namespace MQTTnet.AspNetCore.Routing.Tests
         public sealed class SlimTelemetryPayload
         {
             public int Humidity { get; set; }
+        }
+
+        public enum DeviceMode
+        {
+            Offline,
+            Online
         }
 
         [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
