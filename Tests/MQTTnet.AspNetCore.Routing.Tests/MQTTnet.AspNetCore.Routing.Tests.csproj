@@ -12,4 +12,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\Source\MQTTnet.AspNetCore.Routing.csproj" />
 	</ItemGroup>
+	<ItemGroup>
+		<None Include="PublicApi.approved.txt" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
 </Project>

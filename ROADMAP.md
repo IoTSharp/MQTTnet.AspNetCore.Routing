@@ -148,7 +148,7 @@ MQTT routing 也应保持这个分层:
 | 5 | `✅` | R4 Result 体系 | MQTT result 与 return type executor | R2、R3 |
 | 6 | `✅` | R5 Filter 管线 | 授权、资源、action、异常、result 扩展点 | R2、R3、R4 |
 | 7 | `🧪` | R6 性能与 AOT | 缓存热路径、显式注册、trimming 基线 | R1-R5 |
-| 8 | `🕒` | R7 开发者体验 | 文档、示例、测试辅助、API approval | R1-R6 |
+| 8 | `✅` | R7 开发者体验 | 文档、示例、测试辅助、API approval | R1-R6 |
 
 执行原则:
 
@@ -366,23 +366,23 @@ context 应能从 `InterceptingPublishEventArgs` / `MqttApplicationMessageRouteC
 - 高吞吐场景下没有明显反射热点。
 - Native AOT 消费程序有清晰推荐用法。
 
-### 🕒 R7:开发者体验
+### ✅ R7:开发者体验
 
 目标:让库作为通用 NuGet 包更容易使用和维护。
 
 交付:
 
-- 文档:controller routing、binding、payload formatter、result、filter、route catalog、AOT、migration、performance guide。
-- 测试辅助 API:构造 `MqttApplicationMessage` / fake `MqttRequestContext`、执行 route matching 与 action invocation、断言 result、读取 route catalog、快照 route table。
-- 示例项目更新。
-- test helper package 或 test helper namespace。
-- API approval 测试。
+- `✅` 文档:controller routing、binding、payload formatter、result、filter、route catalog、AOT、migration、performance guide。
+- `✅` 测试辅助 API:构造 `MqttApplicationMessage` / fake `MqttRequestContext`、执行 route matching 与 action invocation、断言 result、读取 route catalog、快照 route table。
+- `✅` 示例入口更新:README 增加 docs 与 testing helper 入口,示例项目继续作为 server/client 基线。
+- `✅` test helper namespace:`MQTTnet.AspNetCore.Routing.Testing`。
+- `✅` API approval 测试:`PublicApi_MatchesApprovedSnapshot` 固化 public API 快照。
 
 验收:
 
-- 新使用者能按文档创建 controller、绑定 payload、返回 result、添加 filter。
-- 消费程序可以为自己的业务 topic 写测试,而不必反射内部类型。
-- public API 变更能被测试发现。
+- `✅` 新使用者能按文档创建 controller、绑定 payload、返回 result、添加 filter。
+- `✅` 消费程序可以为自己的业务 topic 写测试,而不必反射内部类型。
+- `✅` public API 变更能被测试发现。
 
 ## 可观测性(贯穿 R5-R7)
 

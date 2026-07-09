@@ -1,0 +1,611 @@
+sealed class MQTTnet.AspNetCore.Routing.Attributes.FromMqttClientAttribute
+  .ctor()
+  .ctor(System.String name)
+  property System.String Name { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.Attributes.FromMqttContextAttribute
+  .ctor()
+
+sealed class MQTTnet.AspNetCore.Routing.Attributes.FromMqttPayloadAttribute
+  .ctor()
+  .ctor(System.String contentType)
+  property System.String ContentType { get; set; }
+  property System.String FormatterName { get; set; }
+
+sealed class MQTTnet.AspNetCore.Routing.Attributes.FromMqttRouteAttribute
+  .ctor()
+  .ctor(System.String name)
+  property System.String Name { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.Attributes.FromMqttSessionAttribute
+  .ctor()
+  .ctor(System.String key)
+  property System.String Key { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.Attributes.FromMqttUserPropertyAttribute
+  .ctor()
+  .ctor(System.String name)
+  property System.String Name { get; }
+
+class MQTTnet.AspNetCore.Routing.Attributes.FromPayloadAttribute
+  .ctor()
+
+class MQTTnet.AspNetCore.Routing.Attributes.MqttControllerContextAttribute
+  .ctor()
+
+interface MQTTnet.AspNetCore.Routing.IMqttActionFilter
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttActionExecutedContext> OnActionExecutionAsync(MQTTnet.AspNetCore.Routing.MqttActionExecutingContext context, MQTTnet.AspNetCore.Routing.MqttActionExecutionDelegate next)
+
+interface MQTTnet.AspNetCore.Routing.IMqttApplicationMessageDispatcher
+  method System.Threading.Tasks.Task<MQTTnet.AspNetCore.Routing.MqttApplicationMessageDispatchResult> DispatchAsync(MQTTnet.MqttApplicationMessage applicationMessage, System.String clientId, System.Threading.CancellationToken cancellationToken)
+  method System.Threading.Tasks.Task<MQTTnet.AspNetCore.Routing.MqttApplicationMessageDispatchResult> DispatchAsync(MQTTnet.MqttApplicationMessageReceivedEventArgs eventArgs, System.Threading.CancellationToken cancellationToken)
+
+interface MQTTnet.AspNetCore.Routing.IMqttAuthorizationFilter
+  method System.Threading.Tasks.ValueTask OnAuthorizationAsync(MQTTnet.AspNetCore.Routing.MqttAuthorizationFilterContext context)
+
+interface MQTTnet.AspNetCore.Routing.IMqttControllerContext
+  property MQTTnet.Server.InterceptingPublishEventArgs MqttContext { get; set; }
+  property MQTTnet.Server.MqttServer MqttServer { get; set; }
+
+interface MQTTnet.AspNetCore.Routing.IMqttExceptionFilter
+  method System.Threading.Tasks.ValueTask OnExceptionAsync(MQTTnet.AspNetCore.Routing.MqttExceptionContext context)
+
+interface MQTTnet.AspNetCore.Routing.IMqttFilterMetadata
+
+interface MQTTnet.AspNetCore.Routing.IMqttPayloadInputFormatter
+  property System.String Name { get; }
+  method System.Boolean CanRead(MQTTnet.AspNetCore.Routing.MqttPayloadInputFormatterContext context)
+  method System.Threading.Tasks.ValueTask<System.Object> ReadAsync(MQTTnet.AspNetCore.Routing.MqttPayloadInputFormatterContext context)
+
+interface MQTTnet.AspNetCore.Routing.IMqttPayloadOutputFormatter
+  property System.String Name { get; }
+  method System.Boolean CanWrite(MQTTnet.AspNetCore.Routing.MqttPayloadOutputFormatterContext context)
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttPayloadWriteResult> WriteAsync(MQTTnet.AspNetCore.Routing.MqttPayloadOutputFormatterContext context)
+
+interface MQTTnet.AspNetCore.Routing.IMqttResourceFilter
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttResourceExecutedContext> OnResourceExecutionAsync(MQTTnet.AspNetCore.Routing.MqttResourceExecutingContext context, MQTTnet.AspNetCore.Routing.MqttResourceExecutionDelegate next)
+
+interface MQTTnet.AspNetCore.Routing.IMqttResultFilter
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttResultExecutedContext> OnResultExecutionAsync(MQTTnet.AspNetCore.Routing.MqttResultExecutingContext context, MQTTnet.AspNetCore.Routing.MqttResultExecutionDelegate next)
+
+interface MQTTnet.AspNetCore.Routing.IOrderedMqttFilter
+  property System.Int32 Order { get; }
+
+interface MQTTnet.AspNetCore.Routing.IPublishEventProvider
+  event System.Func<MQTTnet.Server.InterceptingPublishEventArgs, System.Threading.Tasks.Task> OnPublishAsync
+
+sealed class MQTTnet.AspNetCore.Routing.MqttAcknowledgeResult
+  .ctor(System.String reasonString)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttActionContext
+  .ctor(MQTTnet.AspNetCore.Routing.MqttRequestContext requestContext, MQTTnet.AspNetCore.Routing.MqttRouteContext routeContext, MQTTnet.AspNetCore.Routing.MqttModelStateDictionary modelState, System.IServiceProvider requestServices, System.IDisposable loggerScope, MQTTnet.Server.MqttServer mqttServer, MQTTnet.Server.InterceptingPublishEventArgs interceptingPublishContext, MQTTnet.AspNetCore.Routing.MqttRoutingOptions routingOptions)
+  property MQTTnet.AspNetCore.Routing.MqttModelStateDictionary ModelState { get; }
+  property MQTTnet.AspNetCore.Routing.MqttRequestContext RequestContext { get; }
+  property MQTTnet.AspNetCore.Routing.MqttRouteContext RouteContext { get; }
+  property MQTTnet.AspNetCore.Routing.MqttRoutingOptions RoutingOptions { get; }
+  property MQTTnet.MqttApplicationMessage Message { get; }
+  property MQTTnet.Server.InterceptingPublishEventArgs InterceptingPublishContext { get; }
+  property MQTTnet.Server.MqttServer MqttServer { get; }
+  property System.IDisposable LoggerScope { get; }
+  property System.IServiceProvider RequestServices { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttActionExecutedContext
+  .ctor(MQTTnet.AspNetCore.Routing.MqttActionContext actionContext, System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.IMqttFilterMetadata> filters, System.Object controller, System.Reflection.MethodInfo actionMethod, System.Object[] actionArguments, MQTTnet.AspNetCore.Routing.MqttResult result, System.Exception exception, System.Boolean canceled)
+  property MQTTnet.AspNetCore.Routing.MqttResult Result { get; set; }
+  property System.Boolean Canceled { get; }
+  property System.Boolean ExceptionHandled { get; set; }
+  property System.Collections.Generic.IReadOnlyList<System.Object> ActionArguments { get; }
+  property System.Exception Exception { get; set; }
+  property System.Object Controller { get; }
+  property System.Reflection.MethodInfo ActionMethod { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttActionExecutingContext
+  property MQTTnet.AspNetCore.Routing.MqttResult Result { get; set; }
+  property System.Collections.Generic.IReadOnlyList<System.Object> ActionArguments { get; }
+  property System.Object Controller { get; }
+  property System.Reflection.MethodInfo ActionMethod { get; }
+
+delegate MQTTnet.AspNetCore.Routing.MqttActionExecutionDelegate
+  .ctor(System.Object object, System.IntPtr method)
+  method System.IAsyncResult BeginInvoke(System.AsyncCallback callback, System.Object object)
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttActionExecutedContext> EndInvoke(System.IAsyncResult result)
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttActionExecutedContext> Invoke()
+
+sealed class MQTTnet.AspNetCore.Routing.MqttActionModel
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttFilterModel> Filters { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttParameterModel> Parameters { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttRouteModel> Routes { get; }
+  property System.Collections.Generic.IReadOnlyList<System.Object> Metadata { get; }
+  property System.Reflection.MethodInfo ActionMethod { get; }
+  property System.String DeclaredContentType { get; }
+  property System.String DeclaredPayloadFormatterName { get; }
+  property System.String Name { get; }
+  property System.Type ControllerType { get; }
+  property System.Type PayloadType { get; }
+  property System.Type ResultType { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttApplicationMessageDispatchResult
+  .ctor(System.Boolean isHandled, MQTTnet.AspNetCore.Routing.MqttModelStateDictionary modelState)
+  property MQTTnet.AspNetCore.Routing.MqttModelStateDictionary ModelState { get; }
+  property System.Boolean IsHandled { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteBuilder
+  .ctor()
+  method MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteBuilder Map(System.String template, System.Func<MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteContext, System.Threading.Tasks.ValueTask> handler)
+  method MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteBuilder MapJson<TPayload>(System.String template, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TPayload> jsonTypeInfo, System.Func<MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteContext, TPayload, System.Threading.Tasks.ValueTask> handler)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteContext
+  property MQTTnet.AspNetCore.Routing.MqttActionContext ActionContext { get; }
+  property MQTTnet.AspNetCore.Routing.MqttModelStateDictionary ModelState { get; }
+  property MQTTnet.AspNetCore.Routing.MqttRequestContext RequestContext { get; }
+  property MQTTnet.AspNetCore.Routing.MqttRouteContext RouteContext { get; }
+  property MQTTnet.MqttApplicationMessage Message { get; }
+  property System.Collections.Generic.IReadOnlyDictionary<System.String, System.String> RouteValues { get; }
+  property System.IServiceProvider Services { get; }
+  property System.String ClientId { get; }
+  property System.Threading.CancellationToken CancellationToken { get; }
+  method System.Boolean TryGetRouteValue<T>(System.String key, T& value)
+  method System.String GetRouteValue(System.String key)
+  method T GetRouteValue<T>(System.String key)
+
+static class MQTTnet.AspNetCore.Routing.MqttApplicationMessageRoutingServiceCollectionExtensions
+  static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttApplicationMessageRouting(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteBuilder> configure)
+  static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttApplicationMessageSlimRouting(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteBuilder> configure)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttApplicationModel
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttControllerModel> Controllers { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttRouteModel> Routes { get; }
+  property System.Collections.Generic.IReadOnlyList<System.Object> Metadata { get; }
+  static property MQTTnet.AspNetCore.Routing.MqttApplicationModel Empty { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttAuthorizationFilterContext
+  property MQTTnet.AspNetCore.Routing.MqttResult Result { get; set; }
+
+abstract class MQTTnet.AspNetCore.Routing.MqttBaseController
+  property MQTTnet.AspNetCore.Routing.MqttControllerContext ControllerContext { get; set; }
+  property MQTTnet.MqttApplicationMessage Message { get; }
+  property MQTTnet.Server.InterceptingPublishEventArgs MqttContext { get; }
+  property MQTTnet.Server.MqttServer Server { get; }
+  property System.String ClientId { get; }
+  method MQTTnet.AspNetCore.Routing.MqttAcknowledgeResult Acknowledge(System.String reasonString)
+  method MQTTnet.AspNetCore.Routing.MqttPayloadResult<TPayload> Payload<TPayload>(TPayload payload, System.String topic, MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition? disposition)
+  method MQTTnet.AspNetCore.Routing.MqttPublishResult Publish(MQTTnet.MqttApplicationMessage message, MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition? disposition)
+  method MQTTnet.AspNetCore.Routing.MqttRejectResult Reject(MQTTnet.Protocol.MqttPubAckReasonCode reasonCode, System.String reasonString)
+  method MQTTnet.AspNetCore.Routing.MqttSuppressResult Suppress(System.String reasonString)
+  method System.Threading.Tasks.Task Accepted()
+  method System.Threading.Tasks.Task BadMessage()
+  method System.Threading.Tasks.Task Ok()
+  method System.Threading.Tasks.Task<MQTTnet.Server.MqttClientStatus> GetClientStatusAsync()
+  method System.Threading.Tasks.Task<MQTTnet.Server.MqttSessionStatus> GetSessionAsync()
+  method System.Threading.Tasks.Task<T> GetSessionDataAsync<T>(System.String key)
+  method T GetSessionItem<T>()
+  method T GetSessionItem<T>(System.String key)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttBinaryPayloadInputFormatter
+  .ctor()
+  property System.String Name { get; }
+  method System.Boolean CanRead(MQTTnet.AspNetCore.Routing.MqttPayloadInputFormatterContext context)
+  method System.Threading.Tasks.ValueTask<System.Object> ReadAsync(MQTTnet.AspNetCore.Routing.MqttPayloadInputFormatterContext context)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttBinaryPayloadOutputFormatter
+  .ctor()
+  property System.String Name { get; }
+  method System.Boolean CanWrite(MQTTnet.AspNetCore.Routing.MqttPayloadOutputFormatterContext context)
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttPayloadWriteResult> WriteAsync(MQTTnet.AspNetCore.Routing.MqttPayloadOutputFormatterContext context)
+
+enum MQTTnet.AspNetCore.Routing.MqttBindingErrorCode
+  static field MQTTnet.AspNetCore.Routing.MqttBindingErrorCode MissingClientValue
+  static field MQTTnet.AspNetCore.Routing.MqttBindingErrorCode MissingRouteValue
+  static field MQTTnet.AspNetCore.Routing.MqttBindingErrorCode MissingSessionItem
+  static field MQTTnet.AspNetCore.Routing.MqttBindingErrorCode MissingUserProperty
+  static field MQTTnet.AspNetCore.Routing.MqttBindingErrorCode PayloadDeserializationFailed
+  static field MQTTnet.AspNetCore.Routing.MqttBindingErrorCode PayloadFormatterNotFound
+  static field MQTTnet.AspNetCore.Routing.MqttBindingErrorCode TypeConversionFailed
+  static field MQTTnet.AspNetCore.Routing.MqttBindingErrorCode UnsupportedBindingSource
+  field System.Int32 value__
+
+sealed class MQTTnet.AspNetCore.Routing.MqttBindingException
+  .ctor(MQTTnet.AspNetCore.Routing.MqttModelStateDictionary modelState, System.String message, System.Exception innerException)
+  property MQTTnet.AspNetCore.Routing.MqttModelStateDictionary ModelState { get; }
+
+enum MQTTnet.AspNetCore.Routing.MqttBindingSource
+  static field MQTTnet.AspNetCore.Routing.MqttBindingSource Client
+  static field MQTTnet.AspNetCore.Routing.MqttBindingSource Context
+  static field MQTTnet.AspNetCore.Routing.MqttBindingSource Payload
+  static field MQTTnet.AspNetCore.Routing.MqttBindingSource Route
+  static field MQTTnet.AspNetCore.Routing.MqttBindingSource Services
+  static field MQTTnet.AspNetCore.Routing.MqttBindingSource Session
+  static field MQTTnet.AspNetCore.Routing.MqttBindingSource Unknown
+  static field MQTTnet.AspNetCore.Routing.MqttBindingSource UserProperty
+  field System.Int32 value__
+
+class MQTTnet.AspNetCore.Routing.MqttControllerAttribute
+  .ctor()
+
+class MQTTnet.AspNetCore.Routing.MqttControllerContext
+  .ctor()
+  property MQTTnet.AspNetCore.Routing.MqttActionContext ActionContext { get; }
+  property MQTTnet.AspNetCore.Routing.MqttModelStateDictionary ModelState { get; }
+  property MQTTnet.Server.InterceptingPublishEventArgs MqttContext { get; set; }
+  property MQTTnet.Server.MqttServer MqttServer { get; set; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttControllerModel
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttActionModel> Actions { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttFilterModel> Filters { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttRouteModel> Routes { get; }
+  property System.Collections.Generic.IReadOnlyList<System.Object> Metadata { get; }
+  property System.String Name { get; }
+  property System.Type ControllerType { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttExceptionContext
+  property MQTTnet.AspNetCore.Routing.MqttResult Result { get; set; }
+  property System.Boolean ExceptionHandled { get; set; }
+  property System.Exception Exception { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttExceptionToResultFilter
+  .ctor()
+  property System.Int32 Order { get; }
+  method System.Threading.Tasks.ValueTask OnExceptionAsync(MQTTnet.AspNetCore.Routing.MqttExceptionContext context)
+
+abstract class MQTTnet.AspNetCore.Routing.MqttFilterContext
+  property MQTTnet.AspNetCore.Routing.MqttActionContext ActionContext { get; }
+  property MQTTnet.AspNetCore.Routing.MqttModelStateDictionary ModelState { get; }
+  property MQTTnet.AspNetCore.Routing.MqttRequestContext RequestContext { get; }
+  property MQTTnet.AspNetCore.Routing.MqttRouteContext RouteContext { get; }
+  property MQTTnet.MqttApplicationMessage Message { get; }
+  property MQTTnet.Server.InterceptingPublishEventArgs InterceptingPublishContext { get; }
+  property MQTTnet.Server.MqttServer MqttServer { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.IMqttFilterMetadata> Filters { get; }
+  property System.IServiceProvider RequestServices { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttFilterModel
+  .ctor(MQTTnet.AspNetCore.Routing.IMqttFilterMetadata filterInstance, System.Int32 order, System.Collections.Generic.IEnumerable<System.Object> metadata)
+  .ctor(System.Type filterType, System.Int32 order, System.Collections.Generic.IEnumerable<System.Object> metadata)
+  property MQTTnet.AspNetCore.Routing.IMqttFilterMetadata FilterInstance { get; }
+  property System.Collections.Generic.IReadOnlyList<System.Object> Metadata { get; }
+  property System.Int32 Order { get; }
+  property System.Type FilterType { get; }
+
+enum MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition
+  static field MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition Continue
+  static field MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition Reject
+  static field MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition Suppress
+  field System.Int32 value__
+
+sealed class MQTTnet.AspNetCore.Routing.MqttJsonPayloadInputFormatter
+  .ctor()
+  property System.String Name { get; }
+  method System.Boolean CanRead(MQTTnet.AspNetCore.Routing.MqttPayloadInputFormatterContext context)
+  method System.Threading.Tasks.ValueTask<System.Object> ReadAsync(MQTTnet.AspNetCore.Routing.MqttPayloadInputFormatterContext context)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttJsonPayloadOutputFormatter
+  .ctor()
+  property System.String Name { get; }
+  method System.Boolean CanWrite(MQTTnet.AspNetCore.Routing.MqttPayloadOutputFormatterContext context)
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttPayloadWriteResult> WriteAsync(MQTTnet.AspNetCore.Routing.MqttPayloadOutputFormatterContext context)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttLoggingScopeFilter
+  .ctor(Microsoft.Extensions.Logging.ILogger<MQTTnet.AspNetCore.Routing.MqttLoggingScopeFilter> logger)
+  property System.Int32 Order { get; }
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttResourceExecutedContext> OnResourceExecutionAsync(MQTTnet.AspNetCore.Routing.MqttResourceExecutingContext context, MQTTnet.AspNetCore.Routing.MqttResourceExecutionDelegate next)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttModelStateDictionary
+  .ctor()
+  property System.Boolean IsValid { get; }
+  property System.Collections.Generic.IEnumerable<System.String> Keys { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttModelStateError> Item { get; }
+  property System.Int32 ErrorCount { get; }
+  method System.Boolean TryGetErrors(System.String key, System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttModelStateError>& errors)
+  method void AddModelError(System.String key, MQTTnet.AspNetCore.Routing.MqttBindingErrorCode errorCode, System.String message)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttModelStateError
+  .ctor(MQTTnet.AspNetCore.Routing.MqttBindingErrorCode errorCode, System.String message)
+  property MQTTnet.AspNetCore.Routing.MqttBindingErrorCode ErrorCode { get; }
+  property System.String Message { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttModelStateInvalidFilter
+  .ctor()
+  property System.Int32 Order { get; }
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttActionExecutedContext> OnActionExecutionAsync(MQTTnet.AspNetCore.Routing.MqttActionExecutingContext context, MQTTnet.AspNetCore.Routing.MqttActionExecutionDelegate next)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttParameterModel
+  property MQTTnet.AspNetCore.Routing.MqttBindingSource BindingSource { get; }
+  property System.Boolean IsOptional { get; }
+  property System.Collections.Generic.IReadOnlyList<System.Object> Metadata { get; }
+  property System.Collections.Generic.IReadOnlyList<System.String> RouteConstraints { get; }
+  property System.Object DefaultValue { get; }
+  property System.Reflection.ParameterInfo ParameterInfo { get; }
+  property System.String BindingName { get; }
+  property System.String DeclaredContentType { get; }
+  property System.String FormatterName { get; }
+  property System.String Name { get; }
+  property System.Type ParameterType { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttPayloadInputFormatterContext
+  .ctor(MQTTnet.AspNetCore.Routing.MqttActionContext actionContext, System.Type modelType, System.Text.Json.Serialization.Metadata.JsonTypeInfo jsonTypeInfo, System.String contentType, System.String formatterName)
+  property MQTTnet.AspNetCore.Routing.MqttActionContext ActionContext { get; }
+  property MQTTnet.MqttApplicationMessage Message { get; }
+  property System.Buffers.ReadOnlySequence<System.Byte> Payload { get; }
+  property System.String ContentType { get; }
+  property System.String FormatterName { get; }
+  property System.Text.Json.Serialization.Metadata.JsonTypeInfo JsonTypeInfo { get; }
+  property System.Threading.CancellationToken CancellationToken { get; }
+  property System.Type ModelType { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttPayloadOutputFormatterContext
+  .ctor(MQTTnet.AspNetCore.Routing.MqttActionContext actionContext, System.Object value, System.Type payloadType, System.Text.Json.Serialization.Metadata.JsonTypeInfo jsonTypeInfo, System.String contentType, System.String formatterName)
+  property MQTTnet.AspNetCore.Routing.MqttActionContext ActionContext { get; }
+  property System.Object Value { get; }
+  property System.String ContentType { get; }
+  property System.String FormatterName { get; }
+  property System.Text.Json.Serialization.Metadata.JsonTypeInfo JsonTypeInfo { get; }
+  property System.Threading.CancellationToken CancellationToken { get; }
+  property System.Type PayloadType { get; }
+
+class MQTTnet.AspNetCore.Routing.MqttPayloadResult
+  .ctor(System.Object payload, System.Type payloadType, System.String topic, MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition? disposition)
+  property MQTTnet.Protocol.MqttQualityOfServiceLevel? QualityOfServiceLevel { get; set; }
+  property System.Boolean Retain { get; set; }
+  property System.Byte[] CorrelationData { get; set; }
+  property System.Object Payload { get; }
+  property System.String ContentType { get; set; }
+  property System.String FormatterName { get; set; }
+  property System.String Topic { get; }
+  property System.Type PayloadType { get; }
+  method System.Threading.Tasks.ValueTask ExecuteAsync(MQTTnet.AspNetCore.Routing.MqttActionContext context)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttPayloadResult<TPayload>
+  .ctor(TPayload payload, System.String topic, MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition? disposition)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttPayloadSizeLimitFilter
+  .ctor()
+  property System.Int32 Order { get; }
+  method System.Threading.Tasks.ValueTask OnAuthorizationAsync(MQTTnet.AspNetCore.Routing.MqttAuthorizationFilterContext context)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttPayloadWriteResult
+  .ctor(System.ReadOnlyMemory<System.Byte> payload, System.String contentType)
+  property System.ReadOnlyMemory<System.Byte> Payload { get; }
+  property System.String ContentType { get; }
+
+class MQTTnet.AspNetCore.Routing.MqttPublishResult
+  .ctor(MQTTnet.MqttApplicationMessage message, MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition? disposition)
+  property MQTTnet.MqttApplicationMessage Message { get; }
+  method System.Threading.Tasks.ValueTask ExecuteAsync(MQTTnet.AspNetCore.Routing.MqttActionContext context)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttRejectResult
+  .ctor(MQTTnet.Protocol.MqttPubAckReasonCode reasonCode, System.String reasonString)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttRequestContext
+  .ctor(MQTTnet.MqttApplicationMessage message, System.String clientId, System.Collections.IDictionary sessionItems, System.String userName, System.Threading.CancellationToken cancellationToken)
+  property MQTTnet.MqttApplicationMessage Message { get; }
+  property MQTTnet.Protocol.MqttQualityOfServiceLevel QualityOfServiceLevel { get; }
+  property System.Boolean Retain { get; }
+  property System.Buffers.ReadOnlySequence<System.Byte> Payload { get; }
+  property System.Byte[] CorrelationData { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.Packets.MqttUserProperty> UserProperties { get; }
+  property System.Collections.IDictionary SessionItems { get; }
+  property System.String ClientId { get; }
+  property System.String ContentType { get; }
+  property System.String ResponseTopic { get; }
+  property System.String Topic { get; }
+  property System.String UserName { get; }
+  property System.Threading.CancellationToken CancellationToken { get; }
+  method System.Boolean TryGetUserProperty(System.String name, System.String& value)
+  method System.Collections.Generic.IReadOnlyList<System.String> GetUserProperties(System.String name)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttResourceExecutedContext
+  .ctor(MQTTnet.AspNetCore.Routing.MqttActionContext actionContext, System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.IMqttFilterMetadata> filters, System.Object controller, System.Reflection.MethodInfo actionMethod, MQTTnet.AspNetCore.Routing.MqttResult result, System.Exception exception, System.Boolean canceled)
+  property MQTTnet.AspNetCore.Routing.MqttResult Result { get; set; }
+  property System.Boolean Canceled { get; }
+  property System.Boolean ExceptionHandled { get; set; }
+  property System.Exception Exception { get; set; }
+  property System.Object Controller { get; }
+  property System.Reflection.MethodInfo ActionMethod { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttResourceExecutingContext
+  property MQTTnet.AspNetCore.Routing.MqttResult Result { get; set; }
+  property System.Object Controller { get; }
+  property System.Reflection.MethodInfo ActionMethod { get; }
+
+delegate MQTTnet.AspNetCore.Routing.MqttResourceExecutionDelegate
+  .ctor(System.Object object, System.IntPtr method)
+  method System.IAsyncResult BeginInvoke(System.AsyncCallback callback, System.Object object)
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttResourceExecutedContext> EndInvoke(System.IAsyncResult result)
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttResourceExecutedContext> Invoke()
+
+abstract class MQTTnet.AspNetCore.Routing.MqttResult
+  property MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition? Disposition { get; }
+  property MQTTnet.Protocol.MqttPubAckReasonCode? ReasonCode { get; }
+  property System.Boolean CloseConnection { get; set; }
+  property System.Collections.Generic.IList<MQTTnet.Packets.MqttUserProperty> UserProperties { get; }
+  property System.String ReasonString { get; }
+  method System.Threading.Tasks.ValueTask ExecuteAsync(MQTTnet.AspNetCore.Routing.MqttActionContext context)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttResultExecutedContext
+  .ctor(MQTTnet.AspNetCore.Routing.MqttActionContext actionContext, System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.IMqttFilterMetadata> filters, MQTTnet.AspNetCore.Routing.MqttResult result, System.Exception exception, System.Boolean canceled)
+  property MQTTnet.AspNetCore.Routing.MqttResult Result { get; }
+  property System.Boolean Canceled { get; }
+  property System.Boolean ExceptionHandled { get; set; }
+  property System.Exception Exception { get; set; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttResultExecutingContext
+  property MQTTnet.AspNetCore.Routing.MqttResult Result { get; set; }
+  property System.Boolean Cancel { get; set; }
+
+delegate MQTTnet.AspNetCore.Routing.MqttResultExecutionDelegate
+  .ctor(System.Object object, System.IntPtr method)
+  method System.IAsyncResult BeginInvoke(System.AsyncCallback callback, System.Object object)
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttResultExecutedContext> EndInvoke(System.IAsyncResult result)
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttResultExecutedContext> Invoke()
+
+class MQTTnet.AspNetCore.Routing.MqttRouteAttribute
+  .ctor()
+  .ctor(System.String template)
+  property System.String Name { get; set; }
+  property System.String Template { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttRouteCatalog
+  property MQTTnet.AspNetCore.Routing.MqttApplicationModel ApplicationModel { get; }
+  property System.Boolean HasErrors { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttRouteDiagnostic> Diagnostics { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttRouteModel> Routes { get; }
+  static property MQTTnet.AspNetCore.Routing.MqttRouteCatalog Empty { get; }
+  method System.String CreateSnapshot()
+  method void ThrowIfErrors()
+
+sealed class MQTTnet.AspNetCore.Routing.MqttRouteContext
+  .ctor(MQTTnet.AspNetCore.Routing.MqttRouteModel matchedRoute, System.Collections.Generic.IReadOnlyDictionary<System.String, System.Object> routeValues)
+  property MQTTnet.AspNetCore.Routing.MqttRouteModel MatchedRoute { get; }
+  property System.Collections.Generic.IReadOnlyDictionary<System.String, System.Object> RouteValues { get; }
+  property System.Reflection.MethodInfo ActionMethod { get; }
+  method System.Boolean TryGetRouteValue<T>(System.String key, T& value, System.String& errorMessage)
+  method T GetRouteValue<T>(System.String key)
+
+sealed class MQTTnet.AspNetCore.Routing.MqttRouteDiagnostic
+  property MQTTnet.AspNetCore.Routing.MqttRouteDiagnosticSeverity Severity { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttRouteModel> Routes { get; }
+  property System.String Code { get; }
+  property System.String Message { get; }
+
+enum MQTTnet.AspNetCore.Routing.MqttRouteDiagnosticSeverity
+  static field MQTTnet.AspNetCore.Routing.MqttRouteDiagnosticSeverity Error
+  static field MQTTnet.AspNetCore.Routing.MqttRouteDiagnosticSeverity Info
+  static field MQTTnet.AspNetCore.Routing.MqttRouteDiagnosticSeverity Warning
+  field System.Int32 value__
+
+enum MQTTnet.AspNetCore.Routing.MqttRouteKind
+  static field MQTTnet.AspNetCore.Routing.MqttRouteKind ApplicationMessage
+  static field MQTTnet.AspNetCore.Routing.MqttRouteKind ControllerAction
+  field System.Int32 value__
+
+sealed class MQTTnet.AspNetCore.Routing.MqttRouteModel
+  property MQTTnet.AspNetCore.Routing.MqttRouteKind Kind { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttFilterModel> Filters { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttParameterModel> RouteParameters { get; }
+  property System.Collections.Generic.IReadOnlyList<System.Object> Metadata { get; }
+  property System.Reflection.MethodInfo ActionMethod { get; }
+  property System.String ControllerTemplate { get; }
+  property System.String DeclaredContentType { get; }
+  property System.String DeclaredPayloadFormatterName { get; }
+  property System.String Template { get; }
+  property System.Type ControllerType { get; }
+  property System.Type PayloadType { get; }
+  property System.Type ResultType { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttRoutingMetricsFilter
+  .ctor()
+  property System.Int32 Order { get; }
+  method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttResourceExecutedContext> OnResourceExecutionAsync(MQTTnet.AspNetCore.Routing.MqttResourceExecutingContext context, MQTTnet.AspNetCore.Routing.MqttResourceExecutionDelegate next)
+
+class MQTTnet.AspNetCore.Routing.MqttRoutingOptions
+  .ctor()
+  property System.Boolean CaseSensitiveTopicMatching { get; set; }
+  property System.Collections.Generic.IList<MQTTnet.AspNetCore.Routing.IMqttPayloadInputFormatter> InputFormatters { get; }
+  property System.Collections.Generic.IList<MQTTnet.AspNetCore.Routing.IMqttPayloadOutputFormatter> OutputFormatters { get; }
+  property System.Collections.Generic.IList<MQTTnet.AspNetCore.Routing.MqttFilterModel> Filters { get; }
+  property System.Int64? MaxPayloadSizeBytes { get; set; }
+  property System.Reflection.Assembly[] FromAssemblies { get; }
+  property System.String DefaultPayloadContentType { get; set; }
+  property System.String DefaultPayloadFormatterName { get; set; }
+  property System.Text.Json.JsonSerializerOptions SerializerOptions { get; }
+  property System.Text.Json.Serialization.JsonSerializerContext SerializerContext { get; }
+  property System.Type RouteInvocationInterceptor { get; }
+  property System.Type[] ControllerTypes { get; }
+
+sealed class MQTTnet.AspNetCore.Routing.MqttSuppressResult
+  .ctor(System.String reasonString)
+
+interface MQTTnet.AspNetCore.Routing.Routing.IRouteInvocationInterceptor
+  method System.Threading.Tasks.Task RouteExecuted(System.Object correlationObject, MQTTnet.Server.InterceptingPublishEventArgs publishEventArgs, System.Exception ex)
+  method System.Threading.Tasks.Task<System.Object> RouteExecuting(MQTTnet.Server.InterceptingPublishEventArgs publishEventArgs)
+
+static class MQTTnet.AspNetCore.Routing.ServiceCollectionExtensions
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions AddMqttFilter(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt, MQTTnet.AspNetCore.Routing.IMqttFilterMetadata filter, System.Int32 order)
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions AddMqttFilter<TFilter>(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt, System.Int32 order)
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions FromAssemblies(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt, params System.Reflection.Assembly[] assemblies)
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions FromControllerTypes(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt, params System.Type[] controllerTypes)
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions WithCaseSensitiveTopicMatching(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt, System.Boolean caseSensitive)
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions WithDefaultPayloadContentType(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt, System.String contentType)
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions WithDefaultPayloadFormatter(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt, System.String formatterName)
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions WithJsonSerializerContext(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt, System.Text.Json.Serialization.JsonSerializerContext context)
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions WithJsonSerializerOptions(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt)
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions WithJsonSerializerOptions(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt, System.Text.Json.JsonSerializerOptions options)
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions WithMaxPayloadSize(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt, System.Int64? maxPayloadSizeBytes)
+  static method Microsoft.AspNetCore.Builder.IApplicationBuilder UseAttributeRouting(Microsoft.AspNetCore.Builder.IApplicationBuilder app, System.Boolean allowUnmatchedRoutes)
+  static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttControllers(Microsoft.Extensions.DependencyInjection.IServiceCollection services)
+  static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttControllers(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<MQTTnet.AspNetCore.Routing.MqttRoutingOptions> _options)
+  static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttControllers(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Reflection.Assembly[] fromAssemblies)
+  static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttControllers(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Type[] controllerTypes, System.Action<MQTTnet.AspNetCore.Routing.MqttRoutingOptions> options)
+  static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttControllers(Microsoft.Extensions.DependencyInjection.IServiceCollection services, params System.Type[] controllerTypes)
+  static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttControllers<TController>(Microsoft.Extensions.DependencyInjection.IServiceCollection services)
+  static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttControllers<TController>(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<MQTTnet.AspNetCore.Routing.MqttRoutingOptions> options)
+  static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttDefaultJsonOptions(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Text.Json.JsonSerializerOptions options)
+  static method void WithAttributeRouting(MQTTnet.Server.MqttServer server, System.IServiceProvider svcProvider, MQTTnet.AspNetCore.Routing.IPublishEventProvider publishEventProvider, System.Boolean allowUnmatchedRoutes)
+  static method void WithAttributeRouting(MQTTnet.Server.MqttServer server, System.IServiceProvider svcProvider, System.Boolean allowUnmatchedRoutes)
+  static method void WithRouteInvocationInterceptor<T>(MQTTnet.AspNetCore.Routing.MqttRoutingOptions opt)
+
+sealed class MQTTnet.AspNetCore.Routing.Testing.MqttControllerRouteTestResult
+  property MQTTnet.AspNetCore.Routing.MqttModelStateDictionary ModelState { get; }
+  property MQTTnet.AspNetCore.Routing.Testing.MqttRouteTestMatch Match { get; }
+  property MQTTnet.MqttApplicationMessage Message { get; }
+  property MQTTnet.Protocol.MqttPubAckReasonCode ReasonCode { get; }
+  property MQTTnet.Server.InterceptingPublishEventArgs InterceptingPublishContext { get; }
+  property System.Boolean CloseConnection { get; }
+  property System.Boolean IsMatched { get; }
+  property System.Boolean ProcessPublish { get; }
+  property System.Collections.Generic.IReadOnlyList<MQTTnet.Packets.MqttUserProperty> UserProperties { get; }
+  property System.String ReasonString { get; }
+
+static class MQTTnet.AspNetCore.Routing.Testing.MqttResultAssert
+  static method MQTTnet.AspNetCore.Routing.MqttAcknowledgeResult IsAcknowledge(MQTTnet.AspNetCore.Routing.MqttResult result)
+  static method MQTTnet.AspNetCore.Routing.MqttPayloadResult IsPayload(MQTTnet.AspNetCore.Routing.MqttResult result)
+  static method MQTTnet.AspNetCore.Routing.MqttPublishResult IsPublish(MQTTnet.AspNetCore.Routing.MqttResult result)
+  static method MQTTnet.AspNetCore.Routing.MqttRejectResult IsReject(MQTTnet.AspNetCore.Routing.MqttResult result, MQTTnet.Protocol.MqttPubAckReasonCode? reasonCode)
+  static method MQTTnet.AspNetCore.Routing.MqttSuppressResult IsSuppress(MQTTnet.AspNetCore.Routing.MqttResult result)
+  static method void HasDisposition(MQTTnet.AspNetCore.Routing.MqttResult result, MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition? disposition)
+
+static class MQTTnet.AspNetCore.Routing.Testing.MqttRouteCatalogAssert
+  static method MQTTnet.AspNetCore.Routing.MqttRouteModel ContainsControllerAction(MQTTnet.AspNetCore.Routing.MqttRouteCatalog catalog, System.Type controllerType, System.String actionName, System.String template)
+  static method MQTTnet.AspNetCore.Routing.MqttRouteModel ContainsRoute(MQTTnet.AspNetCore.Routing.MqttRouteCatalog catalog, System.String template)
+  static method void DoesNotContainRoute(MQTTnet.AspNetCore.Routing.MqttRouteCatalog catalog, System.String template)
+  static method void HasNoErrors(MQTTnet.AspNetCore.Routing.MqttRouteCatalog catalog)
+
+sealed class MQTTnet.AspNetCore.Routing.Testing.MqttRouteTestException
+  .ctor(System.String message)
+  .ctor(System.String message, System.Exception innerException)
+
+sealed class MQTTnet.AspNetCore.Routing.Testing.MqttRouteTestMatch
+  property MQTTnet.AspNetCore.Routing.MqttRouteModel Route { get; }
+  property System.Boolean IsMatched { get; }
+  property System.Collections.Generic.IReadOnlyDictionary<System.String, System.Object> RouteValues { get; }
+  property System.String Template { get; }
+  method T GetRouteValue<T>(System.String key)
+  method void EnsureMatched(System.String message)
+  method void EnsureNotMatched(System.String message)
+
+sealed class MQTTnet.AspNetCore.Routing.Testing.MqttRoutingTestHost
+  .ctor(System.IServiceProvider services)
+  property MQTTnet.AspNetCore.Routing.MqttRouteCatalog Catalog { get; }
+  property System.IServiceProvider Services { get; }
+  method MQTTnet.AspNetCore.Routing.Testing.MqttRouteTestMatch Match(System.String topic)
+  method System.String CreateRouteSnapshot()
+  method System.Threading.Tasks.Task<MQTTnet.AspNetCore.Routing.MqttApplicationMessageDispatchResult> DispatchApplicationMessageAsync(MQTTnet.MqttApplicationMessage message, System.String clientId, System.Threading.CancellationToken cancellationToken)
+  method System.Threading.Tasks.Task<MQTTnet.AspNetCore.Routing.Testing.MqttControllerRouteTestResult> InvokeControllerAsync(MQTTnet.MqttApplicationMessage message, System.String clientId, System.String userName, System.Collections.IDictionary sessionItems, System.Boolean allowUnmatchedRoutes, MQTTnet.Server.MqttServer mqttServer, System.Threading.CancellationToken cancellationToken)
+  method void Dispose()
+  static method MQTTnet.AspNetCore.Routing.Testing.MqttRoutingTestHost Create(System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection> configureServices)
+
+static class MQTTnet.AspNetCore.Routing.Testing.MqttTestContexts
+  static method MQTTnet.AspNetCore.Routing.MqttActionContext CreateActionContext(MQTTnet.MqttApplicationMessage message, System.String clientId, System.Collections.Generic.IReadOnlyDictionary<System.String, System.Object> routeValues, MQTTnet.AspNetCore.Routing.MqttRouteModel matchedRoute, System.IServiceProvider requestServices, MQTTnet.AspNetCore.Routing.MqttRoutingOptions routingOptions, MQTTnet.AspNetCore.Routing.MqttModelStateDictionary modelState, System.Collections.IDictionary sessionItems, System.String userName, MQTTnet.Server.MqttServer mqttServer, MQTTnet.Server.InterceptingPublishEventArgs interceptingPublishContext, System.Threading.CancellationToken cancellationToken)
+  static method MQTTnet.AspNetCore.Routing.MqttRequestContext CreateRequestContext(MQTTnet.MqttApplicationMessage message, System.String clientId, System.Collections.IDictionary sessionItems, System.String userName, System.Threading.CancellationToken cancellationToken)
+  static method MQTTnet.AspNetCore.Routing.MqttRoutingOptions CreateRoutingOptions(System.Text.Json.JsonSerializerOptions jsonSerializerOptions, System.Text.Json.Serialization.JsonSerializerContext jsonSerializerContext)
+  static method MQTTnet.Server.InterceptingPublishEventArgs CreateInterceptingPublishContext(MQTTnet.MqttApplicationMessage message, System.String clientId, System.String userName, System.Collections.IDictionary sessionItems, System.Boolean processPublish, System.Threading.CancellationToken cancellationToken)
+
+static class MQTTnet.AspNetCore.Routing.Testing.MqttTestMessages
+  static method MQTTnet.MqttApplicationMessage Create(System.String topic, System.String payload, System.String contentType, System.String responseTopic, System.Byte[] correlationData, MQTTnet.Protocol.MqttQualityOfServiceLevel qualityOfServiceLevel, System.Boolean retain, params System.ValueTuple<System.String, System.String>[] userProperties)
+  static method MQTTnet.MqttApplicationMessage CreateBinary(System.String topic, System.ReadOnlyMemory<System.Byte> payload, System.String contentType, System.String responseTopic, System.Byte[] correlationData, MQTTnet.Protocol.MqttQualityOfServiceLevel qualityOfServiceLevel, System.Boolean retain, params System.ValueTuple<System.String, System.String>[] userProperties)
+  static method MQTTnet.MqttApplicationMessage CreateJson<TPayload>(System.String topic, TPayload payload, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TPayload> jsonTypeInfo, System.String contentType, System.String responseTopic, System.Byte[] correlationData, MQTTnet.Protocol.MqttQualityOfServiceLevel qualityOfServiceLevel, System.Boolean retain, params System.ValueTuple<System.String, System.String>[] userProperties)
+
+static class MQTTnet.AspNetCore.Routing.Testing.MqttTestResults
+  static method System.Threading.Tasks.ValueTask ExecuteAsync(MQTTnet.AspNetCore.Routing.MqttResult result, MQTTnet.AspNetCore.Routing.MqttActionContext actionContext)
+  static method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttResult> CreateResultAsync(System.Type declaredReturnType, System.Object returnValue, MQTTnet.AspNetCore.Routing.MqttActionContext actionContext)
+

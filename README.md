@@ -39,6 +39,20 @@ This library has not been tested against a very high-load environment yet.  Ensu
 
 See [ROADMAP.md](ROADMAP.md) for the planned MQTT MVC controller programming model, model binding, result handling, filters, route catalog, compatibility, and performance work.
 
+## Documentation
+
+Focused guides live under [docs](docs/index.md):
+
+* [Controller routing](docs/controller-routing.md)
+* [Binding](docs/binding.md)
+* [Payload formatters](docs/payload-formatters.md)
+* [Results](docs/results.md)
+* [Filters](docs/filters.md)
+* [Route catalog and testing](docs/route-catalog-and-testing.md)
+* [Native AOT](docs/aot.md)
+* [Migration](docs/migration.md)
+* [Performance](docs/performance.md)
+
 ## Supported frameworks
 
 * .NET 8
@@ -184,6 +198,10 @@ public class MqttWeatherForecastController : MqttBaseController // Inherit from 
 [See server example project here](https://github.com/IoTSharp/MQTTnet.AspNetCore.Routing/tree/master/ExampleServer)
 
 [See client example project here](https://github.com/IoTSharp/MQTTnet.AspNetCore.Routing/tree/master/ExampleClient)
+
+### Testing helpers
+
+The `MQTTnet.AspNetCore.Routing.Testing` namespace provides framework-neutral helpers for route catalog assertions, test message creation, direct controller invocation, slim route dispatch, and result assertions. See [Route catalog and testing](docs/route-catalog-and-testing.md).
 
 ## Contributions
 

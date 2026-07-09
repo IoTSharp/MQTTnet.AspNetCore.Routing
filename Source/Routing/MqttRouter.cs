@@ -41,18 +41,18 @@ namespace MQTTnet.AspNetCore.Routing
             this.options = options;
         }
 
-        internal async Task OnIncomingApplicationMessage(IServiceProvider svcProvider, InterceptingPublishEventArgs context, bool allowUnmatchedRoutes)
+        internal async Task<MqttRouteInvocationResult> OnIncomingApplicationMessage(IServiceProvider svcProvider, InterceptingPublishEventArgs context, bool allowUnmatchedRoutes)
         {
             if (context.SessionItems?.Contains(MqttRoutingInternal.ResultPublishSessionItemKey) == true)
             {
-                return;
+                return MqttRouteInvocationResult.Ignored();
             }
 
             // Don't process messages sent from the server itself. This avoids footguns like a server failing to publish
             // a message because a route isn't found on a controller.
             if (context.ClientId == null)
             {
-                return;
+                return MqttRouteInvocationResult.Ignored();
             }
 
             var routeContext = new MqttRouteMatchContext(context.ApplicationMessage.Topic);
@@ -68,6 +68,7 @@ namespace MQTTnet.AspNetCore.Routing
                 }
 
                 context.ProcessPublish = allowUnmatchedRoutes;
+                return MqttRouteInvocationResult.Unmatched();
             }
             else
             {
@@ -140,7 +141,10 @@ namespace MQTTnet.AspNetCore.Routing
                                     filters,
                                     new MqttRejectResult(MQTTnet.Protocol.MqttPubAckReasonCode.PayloadFormatInvalid))
                                 .ConfigureAwait(false);
-                            return;
+                            return MqttRouteInvocationResult.Matched(
+                                routeContext.RouteModel,
+                                routeContext.Parameters,
+                                controllerContext.ModelState);
                         }
                     }
                     var handler = routeContext.Handler ?? throw new InvalidOperationException("Matched MQTT route does not have an action handler.");
@@ -150,6 +154,10 @@ namespace MQTTnet.AspNetCore.Routing
                     await filterPipeline
                         .InvokeAsync(actionContext, routeFilters, classInstance, handler)
                         .ConfigureAwait(false);
+                    return MqttRouteInvocationResult.Matched(
+                        routeContext.RouteModel,
+                        routeContext.Parameters,
+                        actionContext.ModelState);
                 }
             }
         }
