@@ -21,6 +21,8 @@ namespace MQTTnet.AspNetCore.Routing
         private readonly MqttRouteTable routeTable;
         private readonly ITypeActivatorCache typeActivator;
         private readonly MqttActionParameterBinder parameterBinder;
+        private readonly MqttActionResultExecutor actionResultExecutor;
+        private readonly MqttRoutingOptions options;
 
         public MqttServer? Server { get; set; }
 
@@ -28,16 +30,25 @@ namespace MQTTnet.AspNetCore.Routing
             ILogger<MqttRouter> logger,
             MqttRouteTable routeTable,
             ITypeActivatorCache typeActivator,
-            MqttActionParameterBinder parameterBinder)
+            MqttActionParameterBinder parameterBinder,
+            MqttActionResultExecutor actionResultExecutor,
+            MqttRoutingOptions options)
         {
             this.logger = logger;
             this.routeTable = routeTable;
             this.typeActivator = typeActivator;
             this.parameterBinder = parameterBinder;
+            this.actionResultExecutor = actionResultExecutor;
+            this.options = options;
         }
 
         internal async Task OnIncomingApplicationMessage(IServiceProvider svcProvider, InterceptingPublishEventArgs context, bool allowUnmatchedRoutes)
         {
+            if (context.SessionItems?.Contains(MqttRoutingInternal.ResultPublishSessionItemKey) == true)
+            {
+                return;
+            }
+
             // Don't process messages sent from the server itself. This avoids footguns like a server failing to publish
             // a message because a route isn't found on a controller.
             if (context.ClientId == null)
@@ -109,7 +120,9 @@ namespace MQTTnet.AspNetCore.Routing
                         controllerContext.ModelState,
                         scope.ServiceProvider,
                         loggerScope,
-                        Server);
+                        Server,
+                        context,
+                        options);
                     controllerContext.ActionContext = actionContext;
 
                     for (int i = 0; i < activateProperties.Length; i++)
@@ -140,87 +153,68 @@ namespace MQTTnet.AspNetCore.Routing
 
                     context.ProcessPublish = true;
 
-                    if (parameters.Length == 0)
+                    try
                     {
-                        await HandlerInvoker(handler, classInstance, null).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        object?[] paramArray;
+                        object?[]? paramArray = null;
 
-                        try
+                        if (parameters.Length > 0)
                         {
                             paramArray = await parameterBinder
                                 .BindAsync(parameters, actionContext)
                                 .ConfigureAwait(false);
-
-                            await HandlerInvoker(handler, classInstance, paramArray).ConfigureAwait(false);
                         }
-                        catch (MqttBindingException ex)
-                        {
-                            logger.LogDebug(
-                                ex,
-                                "MQTT action binding failed for topic '{Topic}' with {ErrorCount} model state error(s).",
-                                context.ApplicationMessage.Topic,
-                                ex.ModelState.ErrorCount);
 
-                            context.ProcessPublish = false;
-                        }
-                        catch (ArgumentException ex)
-                        {
-                            logger.LogError(ex, $"Unable to match route parameters to all arguments. See inner exception for details.");
+                        var returnValue = HandlerInvoker(handler, classInstance, paramArray);
+                        await actionResultExecutor
+                            .ExecuteAsync(handler.ReturnType, returnValue, actionContext)
+                            .ConfigureAwait(false);
+                    }
+                    catch (MqttBindingException ex)
+                    {
+                        logger.LogDebug(
+                            ex,
+                            "MQTT action binding failed for topic '{Topic}' with {ErrorCount} model state error(s).",
+                            context.ApplicationMessage.Topic,
+                            ex.ModelState.ErrorCount);
 
-                            context.ProcessPublish = false;
-                        }
-                        catch (TargetInvocationException ex) when (ex.InnerException is MqttBindingException bindingException)
-                        {
-                            logger.LogDebug(
-                                bindingException,
-                                "MQTT action binding failed for topic '{Topic}' with {ErrorCount} model state error(s).",
-                                context.ApplicationMessage.Topic,
-                                bindingException.ModelState.ErrorCount);
+                        context.ProcessPublish = false;
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        logger.LogError(ex, $"Unable to match route parameters to all arguments. See inner exception for details.");
 
-                            context.ProcessPublish = false;
-                        }
-                        catch (TargetInvocationException ex)
-                        {
-                            logger.LogError(ex.InnerException, $"Unhandled MQTT action exception. See inner exception for details.");
+                        context.ProcessPublish = false;
+                    }
+                    catch (TargetInvocationException ex) when (ex.InnerException is MqttBindingException bindingException)
+                    {
+                        logger.LogDebug(
+                            bindingException,
+                            "MQTT action binding failed for topic '{Topic}' with {ErrorCount} model state error(s).",
+                            context.ApplicationMessage.Topic,
+                            bindingException.ModelState.ErrorCount);
 
-                            // This is an unandled exception from the invoked action
-                            context.ProcessPublish = false;
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogError(ex, "Unable to invoke Mqtt Action.  See inner exception for details.");
+                        context.ProcessPublish = false;
+                    }
+                    catch (TargetInvocationException ex)
+                    {
+                        logger.LogError(ex.InnerException, $"Unhandled MQTT action exception. See inner exception for details.");
 
-                            context.ProcessPublish = false;
-                        }
+                        // This is an unandled exception from the invoked action
+                        context.ProcessPublish = false;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Unable to invoke Mqtt Action.  See inner exception for details.");
+
+                        context.ProcessPublish = false;
                     }
                 }
             }
         }
 
-        private static Task HandlerInvoker(MethodInfo method, object instance, object?[]? parameters)
+        private static object? HandlerInvoker(MethodInfo method, object instance, object?[]? parameters)
         {
-            if (method.ReturnType == typeof(void))
-            {
-                method.Invoke(instance, parameters);
-
-                return Task.CompletedTask;
-            }
-            else if (method.ReturnType == typeof(Task))
-            {
-                var result = (Task?)method.Invoke(instance, parameters);
-
-                if (result == null)
-                {
-                    throw new NullReferenceException($"{method.DeclaringType?.FullName ?? "<unknown>"}.{method.Name} returned null instead of Task");
-                }
-
-                return result;
-            }
-
-            throw new InvalidOperationException($"Unsupported Action return type \"{method.ReturnType}\" on method {method.DeclaringType?.FullName ?? "<unknown>"}.{method.Name}. Only void and {nameof(Task)} are allowed.");
+            return method.Invoke(instance, parameters);
         }
 
         private static bool TryBindControllerRouteProperties(

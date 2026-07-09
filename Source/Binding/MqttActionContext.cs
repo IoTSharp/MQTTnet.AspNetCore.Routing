@@ -20,13 +20,17 @@ namespace MQTTnet.AspNetCore.Routing
         /// <param name="requestServices">当前请求作用域服务。</param>
         /// <param name="loggerScope">日志作用域。</param>
         /// <param name="mqttServer">MQTT server 实例；非 server 路径可为空。</param>
+        /// <param name="interceptingPublishContext">MQTTnet server publish 拦截上下文；非 server 路径可为空。</param>
+        /// <param name="routingOptions">MQTT routing 配置；result 执行时用于选择 formatter。</param>
         public MqttActionContext(
             MqttRequestContext requestContext,
             MqttRouteContext routeContext,
             MqttModelStateDictionary modelState,
             IServiceProvider requestServices,
             IDisposable? loggerScope = null,
-            MqttServer? mqttServer = null)
+            MqttServer? mqttServer = null,
+            InterceptingPublishEventArgs? interceptingPublishContext = null,
+            MqttRoutingOptions? routingOptions = null)
         {
             RequestContext = requestContext ?? throw new ArgumentNullException(nameof(requestContext));
             RouteContext = routeContext ?? throw new ArgumentNullException(nameof(routeContext));
@@ -34,6 +38,8 @@ namespace MQTTnet.AspNetCore.Routing
             RequestServices = requestServices ?? throw new ArgumentNullException(nameof(requestServices));
             LoggerScope = loggerScope;
             MqttServer = mqttServer;
+            InterceptingPublishContext = interceptingPublishContext;
+            RoutingOptions = routingOptions;
         }
 
         /// <summary>
@@ -65,6 +71,16 @@ namespace MQTTnet.AspNetCore.Routing
         /// MQTT server 实例；客户端或直接分发路径为空。
         /// </summary>
         public MqttServer? MqttServer { get; }
+
+        /// <summary>
+        /// MQTTnet server publish 拦截上下文；客户端或直接分发路径为空。
+        /// </summary>
+        public InterceptingPublishEventArgs? InterceptingPublishContext { get; }
+
+        /// <summary>
+        /// MQTT routing 配置；result 执行时用于选择 payload formatter。
+        /// </summary>
+        public MqttRoutingOptions? RoutingOptions { get; }
 
         /// <summary>
         /// 原始 MQTT 应用消息。

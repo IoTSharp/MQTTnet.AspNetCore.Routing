@@ -247,6 +247,7 @@ namespace MQTTnet.AspNetCore.Routing
         {
             services.AddSingleton<ITypeActivatorCache>(new TypeActivatorCache());
             services.AddSingleton<MqttActionParameterBinder>();
+            services.AddSingleton<MqttActionResultExecutor>();
             services.AddTransient<MqttRouter>();
             if (options.RouteInvocationInterceptor != null)
             {

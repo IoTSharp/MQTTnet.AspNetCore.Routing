@@ -144,7 +144,7 @@ MQTT routing 也应保持这个分层:
 | 2 | `✅` | R1 绑定正确性 | 统一 model state,修复 Guid/enum/nullable 转换,两路径去除 payload 复制 | R0 |
 | 3 | `✅` | R2 Application Model 与 Route Catalog | controller/action/route 元数据显式化,后续 binding/result/filter 都依赖它 | R1 |
 | 4 | `✅` | R3 Binding 体系 | MQTT 专用 binding source,替代零散反射绑定 | R2 |
-| 5 | `⬜` | R4 Result 体系 | MQTT result 与 return type executor | R2、R3 |
+| 5 | `✅` | R4 Result 体系 | MQTT result 与 return type executor | R2、R3 |
 | 6 | `⬜` | R5 Filter 管线 | 授权、资源、action、异常、result 扩展点 | R2、R3、R4 |
 | 7 | `🧪` | R6 性能与 AOT | 缓存热路径、显式注册、trimming 基线 | R1-R5 |
 | 8 | `🕒` | R7 开发者体验 | 文档、示例、测试辅助、API approval | R1-R6 |
@@ -286,23 +286,34 @@ context 应能从 `InterceptingPublishEventArgs` / `MqttApplicationMessageRouteC
 - action 参数不必手动读取原始 message 即可绑定 route、payload、session、client 信息与 user properties。
 - 消费程序可注册自定义 formatter,而本库默认只依赖 JSON + 二进制。
 
-### ⬜ R4:Result 体系
+### ✅ R4:Result 体系
 
 目标:让 action 返回值表达 MQTT 处理结果,而不是只依赖 `Ok()` / `BadMessage()`。
 
 交付:
 
-- result 类型:`MqttResult`、`MqttAcceptedResult`、`MqttRejectedResult`、`MqttNoContentResult`、`MqttPublishResult`、`MqttPayloadResult<T>`。
-- return type executor,支持 `void`、`Task`、`ValueTask`、`MqttResult`、`Task<MqttResult>`、`ValueTask<MqttResult>`、`T`、`Task<T>`、`ValueTask<T>`;其中 `T` 通过 output formatter 变成 result。
+- result 类型:`MqttResult`、`MqttAcknowledgeResult`、`MqttSuppressResult`、`MqttRejectResult`、`MqttPublishResult`、`MqttPayloadResult<T>`。
+- return type executor,支持 `void`、`Task`、`ValueTask`、`MqttResult`、`Task<MqttResult>`、`ValueTask<MqttResult>`、`T`、`Task<T>`、`ValueTask<T>`;其中 `T` 通过 output formatter 变成 response payload result。
 - output formatter 初版(复用 R3 的 formatter 抽象)。
+- `MqttBaseController` 保留旧 `Ok()` / `Accepted()` / `BadMessage()` 兼容 helper,新增 `Acknowledge()` / `Suppress()` / `Reject()` / `Publish()` / `Payload<T>()`。
 
 设计要求:
 
 - 不套 HTTP status code,也不引入 ProblemDetails。拒绝/异常用 MQTT v5 reason code / reason string 表达。
+- result 先表达**入站 PUBLISH 处置**:`Acknowledge` 继续 broker 原始消息投递,`Suppress` 表示 action 已消费但对发送端成功确认,`Reject` 表示拒绝并写入 PUBACK reason code。
+- 正常接收 PUBLISH 不自动产生业务响应;只有 `MqttPublishResult` / `MqttPayloadResult<T>` 或返回 `T` 且请求带 MQTT v5 response topic 时才额外向 topic 发布响应。
 - 能映射到 `InterceptingPublishEventArgs.ProcessPublish`,选择是否继续 broker 原始消息投递。
-- 能向指定 topic 发布响应,携带 correlation data。
+- 能向指定 topic 或 MQTT v5 response topic 发布响应,并携带 correlation data。
 - 能被 result filter 观察和修改。
 - **AOT 约束**:return type executor 处理 `T` / `Task<T>` / `ValueTask<T>` 时,不得用 `MakeGenericMethod` 在运行时拆包(会触发 IL3050)。AOT 安全的做法只有两条——注册期捕获强类型委托(slim 路径的 `Func<..., TPayload, ValueTask>` 已是此模式),或由 source generator 生成每个 `T` 的 executor。这条约束决定了"支持 `Task<T>`"能否不把库拖出 AOT。output formatter 同理走 `JsonTypeInfo<T>`,不做运行时泛型反射。
+
+当前进展:
+
+- `✅` controller 路径已接入 result executor,旧 `void` / `Task` action 行为保持不变。
+- `✅` `MqttResult` 可控制 `ProcessPublish`、PUBACK reason code / reason string、close connection 和 user properties。
+- `✅` `MqttPayloadResult<T>` 复用 R3 output formatter,默认使用请求 response topic,不会为普通 PUBLISH 自动造响应 topic。
+- `✅` `MqttPublishResult` 通过 `MqttServer.InjectApplicationMessage` 注入响应消息,并使用内部 session 标记避免响应消息被本 router 二次路由拦截。
+- `✅` `Task<T>` / `ValueTask<T>` executor 不使用 `MakeGenericMethod`;controller 反射路径的拆包反射被限制在小 helper 中,R6 再替换为注册期委托或 source generator。
 
 验收:
 

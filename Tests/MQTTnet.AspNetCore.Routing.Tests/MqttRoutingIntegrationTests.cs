@@ -108,6 +108,95 @@ namespace MQTTnet.AspNetCore.Routing.Tests
         }
 
         [TestMethod]
+        public async Task FullRouting_ServerMode_ReturnsPayloadToResponseTopic()
+        {
+            var recorder = new FullRoutingRecorder();
+            using var services = BuildFullRoutingServices(recorder);
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var subscriber = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-rpc-subscriber");
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-rpc-publisher");
+            var responseTopic = "full/replies/rpc-1";
+            var correlationData = new byte[] { 1, 2, 3, 4 };
+            var responseTask = CaptureNextMessageAsync(subscriber);
+
+            var subscription = await subscriber.SubscribeAsync(responseTopic);
+            Assert.AreEqual(MqttClientSubscribeResultCode.GrantedQoS0, subscription.Items.Single().ResultCode);
+
+            var publishResult = await publisher.Client.PublishAsync(
+                new MqttApplicationMessageBuilder()
+                    .WithTopic("full/devices/return/rpc")
+                    .WithPayload("{\"Temperature\":31.25}")
+                    .WithResponseTopic(responseTopic)
+                    .WithCorrelationData(correlationData)
+                    .Build(),
+                CancellationToken.None);
+
+            Assert.IsTrue(publishResult.IsSuccess, publishResult.ReasonString);
+
+            var response = await ExpectMessageAsync(responseTask);
+            var responsePayload = JsonSerializer.Deserialize(
+                response.ConvertPayloadToString(),
+                TestJsonContext.Default.FullResponsePayload);
+
+            Assert.AreEqual(responseTopic, response.Topic);
+            CollectionAssert.AreEqual(correlationData, response.CorrelationData);
+            Assert.IsNotNull(responsePayload);
+            Assert.AreEqual("rpc", responsePayload.Kind);
+            Assert.AreEqual(31.25, responsePayload.Echo);
+            Assert.AreEqual("full-routing-rpc-publisher", responsePayload.ClientId);
+
+            var record = await recorder.ExpectAsync("rpc-result");
+            Assert.AreEqual("return", record.DeviceId);
+        }
+
+        [TestMethod]
+        public async Task FullRouting_ServerMode_TaskResultCanContinueOriginalPublish()
+        {
+            var recorder = new FullRoutingRecorder();
+            using var services = BuildFullRoutingServices(recorder);
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var subscriber = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-task-result-subscriber");
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-task-result-publisher");
+            var receivedTask = CaptureNextMessageAsync(subscriber);
+
+            var subscription = await subscriber.SubscribeAsync("full/devices/return/task-ack");
+            Assert.AreEqual(MqttClientSubscribeResultCode.GrantedQoS0, subscription.Items.Single().ResultCode);
+
+            var publishResult = await publisher.PublishStringAsync("full/devices/return/task-ack", "ack");
+
+            Assert.IsTrue(publishResult.IsSuccess, publishResult.ReasonString);
+            var received = await ExpectMessageAsync(receivedTask);
+            Assert.AreEqual("full/devices/return/task-ack", received.Topic);
+            Assert.AreEqual("ack", received.ConvertPayloadToString());
+
+            var record = await recorder.ExpectAsync("task-result");
+            Assert.AreEqual("return", record.DeviceId);
+        }
+
+        [TestMethod]
+        public async Task FullRouting_ServerMode_SuppressResultConsumesOriginalPublish()
+        {
+            var recorder = new FullRoutingRecorder();
+            using var services = BuildFullRoutingServices(recorder);
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var subscriber = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-suppress-subscriber");
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-suppress-publisher");
+            var receivedTask = CaptureNextMessageAsync(subscriber);
+
+            var subscription = await subscriber.SubscribeAsync("full/devices/return/suppress");
+            Assert.AreEqual(MqttClientSubscribeResultCode.GrantedQoS0, subscription.Items.Single().ResultCode);
+
+            var publishResult = await publisher.PublishStringAsync("full/devices/return/suppress", "consume");
+
+            Assert.IsTrue(publishResult.IsSuccess, publishResult.ReasonString);
+            var record = await recorder.ExpectAsync("suppress-result");
+            Assert.AreEqual("return", record.DeviceId);
+
+            var completed = await Task.WhenAny(receivedTask, Task.Delay(TimeSpan.FromMilliseconds(300)));
+            Assert.AreNotSame(receivedTask, completed, "Suppressed MQTT publish should not be delivered to subscribers.");
+        }
+
+        [TestMethod]
         public async Task FullRouting_ServerMode_RejectsInvalidGuidRouteValue()
         {
             var recorder = new FullRoutingRecorder();
@@ -288,6 +377,29 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.IsFalse(recorder.TryGet("telemetry", out _));
         }
 
+        private static Task<MqttApplicationMessage> CaptureNextMessageAsync(MqttTestClient client)
+        {
+            var source = new TaskCompletionSource<MqttApplicationMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+            client.ApplicationMessageReceivedAsync += args =>
+            {
+                source.TrySetResult(args.ApplicationMessage);
+                return Task.CompletedTask;
+            };
+
+            return source.Task;
+        }
+
+        private static async Task<MqttApplicationMessage> ExpectMessageAsync(Task<MqttApplicationMessage> messageTask)
+        {
+            var completed = await Task.WhenAny(messageTask, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
+            if (completed != messageTask)
+            {
+                Assert.Fail("Timed out waiting for MQTT message.");
+            }
+
+            return await messageTask.ConfigureAwait(false);
+        }
+
         private static ServiceProvider BuildFullRoutingServices(FullRoutingRecorder recorder)
         {
             return new ServiceCollection()
@@ -444,6 +556,59 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                         Server));
 
                 return Ok();
+            }
+
+            [MqttRoute("return/rpc")]
+            public FullResponsePayload ReturnPayload([FromMqttPayload] FullTelemetryPayload payload)
+            {
+                _recorder.Record(
+                    "rpc-result",
+                    new FullRouteRecord(
+                        "return",
+                        payload.Temperature,
+                        "rpc",
+                        ClientId,
+                        Message.Topic,
+                        Server));
+
+                return new FullResponsePayload
+                {
+                    Kind = "rpc",
+                    Echo = payload.Temperature,
+                    ClientId = ClientId
+                };
+            }
+
+            [MqttRoute("return/task-ack")]
+            public Task<MqttResult> ReturnTaskResult()
+            {
+                _recorder.Record(
+                    "task-result",
+                    new FullRouteRecord(
+                        "return",
+                        null,
+                        "task-ack",
+                        ClientId,
+                        Message.Topic,
+                        Server));
+
+                return Task.FromResult<MqttResult>(Acknowledge());
+            }
+
+            [MqttRoute("return/suppress")]
+            public MqttResult ReturnSuppressResult()
+            {
+                _recorder.Record(
+                    "suppress-result",
+                    new FullRouteRecord(
+                        "return",
+                        null,
+                        "suppress",
+                        ClientId,
+                        Message.Topic,
+                        Server));
+
+                return Suppress();
             }
 
             [MqttRoute("{deviceId}/mode/{mode}/{revision:long?}")]
@@ -604,6 +769,15 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             public double Temperature { get; set; }
         }
 
+        public sealed class FullResponsePayload
+        {
+            public string Kind { get; set; }
+
+            public double Echo { get; set; }
+
+            public string ClientId { get; set; }
+        }
+
         public sealed class SlimTelemetryPayload
         {
             public int Humidity { get; set; }
@@ -617,6 +791,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
 
         [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
         [JsonSerializable(typeof(FullTelemetryPayload))]
+        [JsonSerializable(typeof(FullResponsePayload))]
         [JsonSerializable(typeof(SlimTelemetryPayload))]
         public sealed partial class TestJsonContext : JsonSerializerContext
         {

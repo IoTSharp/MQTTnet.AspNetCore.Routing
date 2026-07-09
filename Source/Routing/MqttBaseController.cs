@@ -2,6 +2,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using MQTTnet.AspNetCore.Routing.Attributes;
+using MQTTnet.Protocol;
 using MQTTnet.Server;
 using System;
 using System.Collections.Generic;
@@ -80,6 +81,73 @@ namespace MQTTnet.AspNetCore.Routing
         {
             MqttContext.ProcessPublish = false;
             return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// 返回 MQTT 语义的确认结果，并继续投递原始 PUBLISH。
+        /// </summary>
+        /// <param name="reasonString">可选 MQTT v5 reason string。</param>
+        /// <returns>MQTT 确认结果。</returns>
+        [NonAction]
+        public virtual MqttAcknowledgeResult Acknowledge(string reasonString = null)
+        {
+            return new MqttAcknowledgeResult(reasonString);
+        }
+
+        /// <summary>
+        /// 返回 MQTT 语义的消费结果，不再投递原始 PUBLISH。
+        /// </summary>
+        /// <param name="reasonString">可选 MQTT v5 reason string。</param>
+        /// <returns>MQTT 消费结果。</returns>
+        [NonAction]
+        public virtual MqttSuppressResult Suppress(string reasonString = null)
+        {
+            return new MqttSuppressResult(reasonString);
+        }
+
+        /// <summary>
+        /// 返回 MQTT 语义的拒绝结果。
+        /// </summary>
+        /// <param name="reasonCode">MQTT v5 PUBACK reason code。</param>
+        /// <param name="reasonString">可选 MQTT v5 reason string。</param>
+        /// <returns>MQTT 拒绝结果。</returns>
+        [NonAction]
+        public virtual MqttRejectResult Reject(
+            MqttPubAckReasonCode reasonCode = MqttPubAckReasonCode.UnspecifiedError,
+            string reasonString = null)
+        {
+            return new MqttRejectResult(reasonCode, reasonString);
+        }
+
+        /// <summary>
+        /// 返回向 broker 注入 MQTT 应用消息的结果。
+        /// </summary>
+        /// <param name="message">要注入 broker 的应用消息。</param>
+        /// <param name="disposition">当前入站 PUBLISH 的处置方式；为空表示保持调用前状态。</param>
+        /// <returns>MQTT 发布结果。</returns>
+        [NonAction]
+        public virtual MqttPublishResult Publish(
+            MqttApplicationMessage message,
+            MqttInboundPublishDisposition? disposition = null)
+        {
+            return new MqttPublishResult(message, disposition);
+        }
+
+        /// <summary>
+        /// 返回将 payload 写出到指定 topic 或请求 response topic 的结果。
+        /// </summary>
+        /// <typeparam name="TPayload">payload 类型。</typeparam>
+        /// <param name="payload">要写出的 payload。</param>
+        /// <param name="topic">响应 topic；为空时使用请求消息的 response topic。</param>
+        /// <param name="disposition">当前入站 PUBLISH 的处置方式；为空表示保持调用前状态。</param>
+        /// <returns>MQTT payload 发布结果。</returns>
+        [NonAction]
+        public virtual MqttPayloadResult<TPayload> Payload<TPayload>(
+            TPayload payload,
+            string topic = null,
+            MqttInboundPublishDisposition? disposition = null)
+        {
+            return new MqttPayloadResult<TPayload>(payload, topic, disposition);
         }
 
         public T GetSessionItem<T>(string key)
