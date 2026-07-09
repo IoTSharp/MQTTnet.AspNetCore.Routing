@@ -106,6 +106,7 @@ MQTT routing 也应保持这个分层:
 - `✅` `[FromPayload]` JSON payload 绑定
 - `✅` `Ok()` / `BadMessage()` 基础结果语义
 - `✅` route invocation interceptor
+- `✅` MVC 风格 filter 管线
 - `✅` 反射式路由(`MqttRouter` + `MqttRouteTable` + `WithAttributeRouting`)
 - `✅` slim 委托式路由(`MqttApplicationMessageDispatcher` + `AddMqttApplicationMessageSlimRouting`,基于 `JsonTypeInfo<T>`,dispatch 路径零反射)
 - `✅` 显式 controller type 注册方向
@@ -129,7 +130,7 @@ MQTT routing 也应保持这个分层:
 - `⬜` application model 不够显式。
 - `⚠️` binding 存在正确性 bug(Guid/enum 转换、错误模型不统一),不只是"缺功能"。
 - `⬜` result 类型不够表达化。
-- `⬜` filter 管线不够接近 MVC。
+- `✅` filter 管线已支持授权、资源、action、异常和 result 扩展点。
 - `⬜` route catalog 和测试辅助不足。
 - `⚠️` 两套路径都有热路径反射和 payload 复制可优化。
 - `??` AOT/trimming 体验需要继续硬化。
@@ -145,7 +146,7 @@ MQTT routing 也应保持这个分层:
 | 3 | `✅` | R2 Application Model 与 Route Catalog | controller/action/route 元数据显式化,后续 binding/result/filter 都依赖它 | R1 |
 | 4 | `✅` | R3 Binding 体系 | MQTT 专用 binding source,替代零散反射绑定 | R2 |
 | 5 | `✅` | R4 Result 体系 | MQTT result 与 return type executor | R2、R3 |
-| 6 | `⬜` | R5 Filter 管线 | 授权、资源、action、异常、result 扩展点 | R2、R3、R4 |
+| 6 | `✅` | R5 Filter 管线 | 授权、资源、action、异常、result 扩展点 | R2、R3、R4 |
 | 7 | `🧪` | R6 性能与 AOT | 缓存热路径、显式注册、trimming 基线 | R1-R5 |
 | 8 | `🕒` | R7 开发者体验 | 文档、示例、测试辅助、API approval | R1-R6 |
 
@@ -321,7 +322,7 @@ context 应能从 `InterceptingPublishEventArgs` / `MqttApplicationMessageRouteC
 - result 能控制是否继续原始 publish,并能发布响应 topic。
 - return type executor 在 Native AOT 下无 IL3050 警告。
 
-### ⬜ R5:Filter 管线
+### ✅ R5:Filter 管线
 
 目标:提供 MVC 风格横切扩展点。
 
@@ -332,6 +333,15 @@ context 应能从 `InterceptingPublishEventArgs` / `MqttApplicationMessageRouteC
 - **异常默认语义**:当前实现中 action 抛异常等于 `ProcessPublish=false`(拒绝投递)。引入 exception filter 时必须先声明默认行为(默认拒绝),保持与现有语义兼容,变更走 opt-in。
 
 业务授权、资源隔离、业务审计等 filter 由消费程序实现,本库不内置业务规则。
+
+当前进展:
+
+- `✅` 已新增 `IMqttAuthorizationFilter`、`IMqttResourceFilter`、`IMqttActionFilter`、`IMqttExceptionFilter`、`IMqttResultFilter` 和 ordered metadata。
+- `✅` controller 路径已接入 filter provider 与执行管线,执行顺序为 authorization -> resource -> action -> exception -> result。
+- `✅` 已内置 payload size limit、model state invalid、exception 转 reject result、metrics 和 logging scope filter。
+- `✅` 默认异常 filter 保持历史拒绝语义；消费程序可通过自定义 exception filter opt-in 恢复为 acknowledge/suppress 等 result。
+- `✅` route catalog 已导出 controller/action attribute filter metadata。
+- `✅` global filter 支持类型注册和实例注册；类型注册路径已补 trimming 注解,避免 `ActivatorUtilities` 的 public constructor 需求断链。
 
 验收:
 

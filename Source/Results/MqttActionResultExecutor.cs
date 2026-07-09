@@ -23,6 +23,22 @@ namespace MQTTnet.AspNetCore.Routing
             object? returnValue,
             MqttActionContext actionContext)
         {
+            var result = await CreateResultAsync(declaredReturnType, returnValue, actionContext)
+                .ConfigureAwait(false);
+            await ExecuteResultAsync(result, actionContext).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 将 action 返回值转换为 MQTT result，但不立即执行 result。
+        /// </summary>
+        /// <param name="declaredReturnType">action 声明返回类型。</param>
+        /// <param name="returnValue">action 实际返回值。</param>
+        /// <param name="actionContext">当前 MQTT action 上下文。</param>
+        public async ValueTask<MqttResult> CreateResultAsync(
+            Type declaredReturnType,
+            object? returnValue,
+            MqttActionContext actionContext)
+        {
             if (declaredReturnType == null)
             {
                 throw new ArgumentNullException(nameof(declaredReturnType));
@@ -35,7 +51,7 @@ namespace MQTTnet.AspNetCore.Routing
 
             if (declaredReturnType == typeof(void))
             {
-                return;
+                return MqttEmptyResult.Instance;
             }
 
             var resultType = declaredReturnType;
@@ -44,13 +60,13 @@ namespace MQTTnet.AspNetCore.Routing
             if (declaredReturnType == typeof(Task))
             {
                 await AwaitTask((Task?)returnValue, declaredReturnType).ConfigureAwait(false);
-                return;
+                return MqttEmptyResult.Instance;
             }
 
             if (declaredReturnType == typeof(ValueTask))
             {
                 await AwaitValueTask(returnValue, declaredReturnType).ConfigureAwait(false);
-                return;
+                return MqttEmptyResult.Instance;
             }
 
             if (TryGetTaskResultType(declaredReturnType, out var taskResultType))
@@ -73,12 +89,30 @@ namespace MQTTnet.AspNetCore.Routing
 
             if (resultValue is MqttResult mqttResult)
             {
-                await mqttResult.ExecuteAsync(actionContext).ConfigureAwait(false);
-                return;
+                return mqttResult;
             }
 
-            var payloadResult = new MqttPayloadResult(resultValue, resultType);
-            await payloadResult.ExecuteAsync(actionContext).ConfigureAwait(false);
+            return new MqttPayloadResult(resultValue, resultType);
+        }
+
+        /// <summary>
+        /// 执行 MQTT result。
+        /// </summary>
+        /// <param name="result">要执行的 result。</param>
+        /// <param name="actionContext">当前 MQTT action 上下文。</param>
+        public ValueTask ExecuteResultAsync(MqttResult result, MqttActionContext actionContext)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            if (actionContext == null)
+            {
+                throw new ArgumentNullException(nameof(actionContext));
+            }
+
+            return result.ExecuteAsync(actionContext);
         }
 
         private static async ValueTask<Task> AwaitTask(Task? task, Type declaredReturnType)

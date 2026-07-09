@@ -151,6 +151,9 @@ namespace MQTTnet.AspNetCore.Routing
                 var actionParameters = methodInfo.GetParameters()
                     .Select(CreateActionParameterModel)
                     .ToArray();
+                var controllerFilters = CreateFilterModels(controllerType.GetCustomAttributes(inherit: true));
+                var actionFilters = CreateFilterModels(methodInfo.GetCustomAttributes(inherit: true));
+                var routeFilters = controllerFilters.Concat(actionFilters).ToArray();
                 var payloadParameter = MqttActionModel.FindPayloadParameter(actionParameters);
                 var payloadType = payloadParameter?.ParameterType;
                 var declaredContentType = payloadParameter?.DeclaredContentType;
@@ -194,6 +197,7 @@ namespace MQTTnet.AspNetCore.Routing
                         methodInfo.ReturnType,
                         declaredContentType,
                         declaredFormatterName,
+                        filters: routeFilters,
                         metadata: methodInfo.GetCustomAttributes(inherit: true).Cast<object>(),
                         parsedTemplate: parsedTemplate.ParsedRouteTemplate,
                         parsedControllerTemplate: parsedControllerTemplate,
@@ -212,6 +216,7 @@ namespace MQTTnet.AspNetCore.Routing
                     methodInfo.ReturnType,
                     declaredContentType,
                     declaredFormatterName,
+                    filters: actionFilters,
                     metadata: methodInfo.GetCustomAttributes(inherit: true).Cast<object>());
 
                 if (!actionsByController.TryGetValue(controllerType, out var controllerActions))
@@ -231,6 +236,7 @@ namespace MQTTnet.AspNetCore.Routing
                         ? controllerRoutes
                         : Array.Empty<MqttRouteModel>(),
                     pair.Value,
+                    filters: CreateFilterModels(pair.Key.GetCustomAttributes(inherit: true)),
                     metadata: pair.Key.GetCustomAttributes(inherit: true).Cast<object>()))
                 .ToArray();
 
@@ -327,6 +333,21 @@ namespace MQTTnet.AspNetCore.Routing
                 bindingName: GetActionParameterBindingName(parameter, bindingSource),
                 declaredContentType: payloadAttribute?.ContentType,
                 formatterName: payloadAttribute?.FormatterName);
+        }
+
+        private static MqttFilterModel[] CreateFilterModels(IEnumerable<object> attributes)
+        {
+            return attributes
+                .OfType<IMqttFilterMetadata>()
+                .Select(filter =>
+                {
+                    var order = filter is IOrderedMqttFilter orderedFilter ? orderedFilter.Order : 0;
+                    return new MqttFilterModel(
+                        filter,
+                        order,
+                        new object[] { filter });
+                })
+                .ToArray();
         }
 
         private static string GetActionParameterBindingName(ParameterInfo parameter, MqttBindingSource bindingSource)

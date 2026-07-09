@@ -15,6 +15,7 @@ public class MqttRoutingOptions
     {
         InputFormatters = new List<IMqttPayloadInputFormatter>();
         OutputFormatters = new List<IMqttPayloadOutputFormatter>();
+        Filters = new List<MqttFilterModel>();
     }
 
     public JsonSerializerOptions SerializerOptions { get;internal set; }
@@ -34,6 +35,11 @@ public class MqttRoutingOptions
     public IList<IMqttPayloadOutputFormatter> OutputFormatters { get; }
 
     /// <summary>
+    /// 全局 MQTT filter。执行时会与 controller/action 上声明的 filter 合并并按 Order 排序。
+    /// </summary>
+    public IList<MqttFilterModel> Filters { get; }
+
+    /// <summary>
     /// 当参数、MQTT v5 content type 和 route metadata 都未声明内容类型时使用的默认 payload content type。
     /// </summary>
     public string DefaultPayloadContentType { get; set; }
@@ -43,5 +49,8 @@ public class MqttRoutingOptions
     /// </summary>
     public string DefaultPayloadFormatterName { get; set; }
 
- 
+    /// <summary>
+    /// 可选 payload 大小上限。为空或小于 0 时不限制。
+    /// </summary>
+    public long? MaxPayloadSizeBytes { get; set; }
 }

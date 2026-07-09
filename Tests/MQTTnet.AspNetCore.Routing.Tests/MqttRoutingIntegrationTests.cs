@@ -197,6 +197,167 @@ namespace MQTTnet.AspNetCore.Routing.Tests
         }
 
         [TestMethod]
+        public async Task FullRouting_FilterPipeline_AuthorizationFilterCanRejectBeforeAction()
+        {
+            var recorder = new FullRoutingRecorder();
+            var filterRecorder = new FilterRecorder();
+            using var services = BuildFullRoutingServices(
+                recorder,
+                options => options.AddMqttFilter(new RejectingAuthorizationFilter(filterRecorder)));
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var subscriber = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-auth-subscriber");
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-auth-publisher");
+            var receivedTask = CaptureNextMessageAsync(subscriber);
+
+            var subscription = await subscriber.SubscribeAsync("full/devices/42/telemetry");
+            Assert.AreEqual(MqttClientSubscribeResultCode.GrantedQoS0, subscription.Items.Single().ResultCode);
+
+            var publishResult = await publisher.PublishStringAsync("full/devices/42/telemetry", "{\"Temperature\":23.5}");
+
+            Assert.IsTrue(publishResult.IsSuccess, publishResult.ReasonString);
+            await filterRecorder.ExpectAsync("authorization");
+            await AssertNoMessageAsync(receivedTask, "Rejected MQTT publish should not be delivered to subscribers.");
+            Assert.IsFalse(recorder.TryGet("telemetry", out _));
+        }
+
+        [TestMethod]
+        public async Task FullRouting_FilterPipeline_ActionFilterWrapsAction()
+        {
+            var recorder = new FullRoutingRecorder();
+            var filterRecorder = new FilterRecorder();
+            using var services = BuildFullRoutingServices(
+                recorder,
+                options => options.AddMqttFilter(new RecordingActionFilter(filterRecorder)));
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-action-filter-publisher");
+
+            var publishResult = await publisher.PublishStringAsync("full/devices/42/telemetry", "{\"Temperature\":23.5}");
+
+            Assert.IsTrue(publishResult.IsSuccess, publishResult.ReasonString);
+            await filterRecorder.ExpectAsync("action-before");
+            var telemetry = await recorder.ExpectAsync("telemetry");
+            await filterRecorder.ExpectAsync("action-after");
+            Assert.AreEqual("42", telemetry.DeviceId);
+            CollectionAssert.AreEqual(
+                new[] { "1:action-before", "2:action-after" },
+                filterRecorder.Events.ToArray());
+        }
+
+        [TestMethod]
+        public async Task FullRouting_FilterPipeline_ResourceFilterWrapsAction()
+        {
+            var recorder = new FullRoutingRecorder();
+            var filterRecorder = new FilterRecorder();
+            using var services = BuildFullRoutingServices(
+                recorder,
+                options => options.AddMqttFilter(new RecordingResourceFilter(filterRecorder)));
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-resource-filter-publisher");
+
+            var publishResult = await publisher.PublishStringAsync("full/devices/42/telemetry", "{\"Temperature\":23.5}");
+
+            Assert.IsTrue(publishResult.IsSuccess, publishResult.ReasonString);
+            await filterRecorder.ExpectAsync("resource-before");
+            var telemetry = await recorder.ExpectAsync("telemetry");
+            await filterRecorder.ExpectAsync("resource-after");
+            Assert.AreEqual("42", telemetry.DeviceId);
+            CollectionAssert.AreEqual(
+                new[] { "1:resource-before", "2:resource-after" },
+                filterRecorder.Events.ToArray());
+        }
+
+        [TestMethod]
+        public async Task FullRouting_FilterPipeline_DefaultExceptionFilterRejectsThrownAction()
+        {
+            var recorder = new FullRoutingRecorder();
+            using var services = BuildFullRoutingServices(recorder);
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var subscriber = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-default-exception-subscriber");
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-default-exception-publisher");
+            var receivedTask = CaptureNextMessageAsync(subscriber);
+
+            var subscription = await subscriber.SubscribeAsync("full/devices/filters/throw");
+            Assert.AreEqual(MqttClientSubscribeResultCode.GrantedQoS0, subscription.Items.Single().ResultCode);
+
+            var publishResult = await publisher.PublishStringAsync("full/devices/filters/throw", "boom");
+
+            Assert.IsTrue(publishResult.IsSuccess, publishResult.ReasonString);
+            await AssertNoMessageAsync(receivedTask, "Default exception handling should reject the original publish.");
+        }
+
+        [TestMethod]
+        public async Task FullRouting_FilterPipeline_ExceptionFilterCanRecoverWithResult()
+        {
+            var recorder = new FullRoutingRecorder();
+            var filterRecorder = new FilterRecorder();
+            using var services = BuildFullRoutingServices(
+                recorder,
+                options => options.AddMqttFilter(new AcknowledgeExceptionFilter(filterRecorder)));
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var subscriber = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-exception-filter-subscriber");
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-exception-filter-publisher");
+            var receivedTask = CaptureNextMessageAsync(subscriber);
+
+            var subscription = await subscriber.SubscribeAsync("full/devices/filters/throw");
+            Assert.AreEqual(MqttClientSubscribeResultCode.GrantedQoS0, subscription.Items.Single().ResultCode);
+
+            var publishResult = await publisher.PublishStringAsync("full/devices/filters/throw", "boom");
+
+            Assert.IsTrue(publishResult.IsSuccess, publishResult.ReasonString);
+            await filterRecorder.ExpectAsync("exception-handled");
+            var received = await ExpectMessageAsync(receivedTask);
+            Assert.AreEqual("full/devices/filters/throw", received.Topic);
+            Assert.AreEqual("boom", received.ConvertPayloadToString());
+        }
+
+        [TestMethod]
+        public async Task FullRouting_FilterPipeline_ResultFilterCanReplaceResult()
+        {
+            var recorder = new FullRoutingRecorder();
+            var filterRecorder = new FilterRecorder();
+            using var services = BuildFullRoutingServices(
+                recorder,
+                options => options.AddMqttFilter(new SuppressAcknowledgeResultFilter(filterRecorder)));
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var subscriber = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-result-filter-subscriber");
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-result-filter-publisher");
+            var receivedTask = CaptureNextMessageAsync(subscriber);
+
+            var subscription = await subscriber.SubscribeAsync("full/devices/return/task-ack");
+            Assert.AreEqual(MqttClientSubscribeResultCode.GrantedQoS0, subscription.Items.Single().ResultCode);
+
+            var publishResult = await publisher.PublishStringAsync("full/devices/return/task-ack", "ack");
+
+            Assert.IsTrue(publishResult.IsSuccess, publishResult.ReasonString);
+            await filterRecorder.ExpectAsync("result-replaced");
+            var record = await recorder.ExpectAsync("task-result");
+            Assert.AreEqual("return", record.DeviceId);
+            await AssertNoMessageAsync(receivedTask, "Result filter should be able to suppress an acknowledged publish.");
+        }
+
+        [TestMethod]
+        public async Task FullRouting_FilterPipeline_PayloadSizeLimitRejectsOversizedPublish()
+        {
+            var recorder = new FullRoutingRecorder();
+            using var services = BuildFullRoutingServices(
+                recorder,
+                options => options.WithMaxPayloadSize(2));
+            await using var broker = await MqttTestBroker.StartAsync(services);
+            await using var subscriber = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-size-limit-subscriber");
+            await using var publisher = await MqttTestClient.ConnectAsync(broker.Port, "full-routing-size-limit-publisher");
+            var receivedTask = CaptureNextMessageAsync(subscriber);
+
+            var subscription = await subscriber.SubscribeAsync("full/devices/42/telemetry");
+            Assert.AreEqual(MqttClientSubscribeResultCode.GrantedQoS0, subscription.Items.Single().ResultCode);
+
+            var publishResult = await publisher.PublishStringAsync("full/devices/42/telemetry", "{\"Temperature\":23.5}");
+
+            Assert.IsTrue(publishResult.IsSuccess, publishResult.ReasonString);
+            await AssertNoMessageAsync(receivedTask, "Oversized MQTT publish should be rejected before action execution.");
+            Assert.IsFalse(recorder.TryGet("telemetry", out _));
+        }
+
+        [TestMethod]
         public async Task FullRouting_ServerMode_RejectsInvalidGuidRouteValue()
         {
             var recorder = new FullRoutingRecorder();
@@ -400,7 +561,15 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             return await messageTask.ConfigureAwait(false);
         }
 
-        private static ServiceProvider BuildFullRoutingServices(FullRoutingRecorder recorder)
+        private static async Task AssertNoMessageAsync(Task<MqttApplicationMessage> messageTask, string failureMessage)
+        {
+            var completed = await Task.WhenAny(messageTask, Task.Delay(TimeSpan.FromMilliseconds(300))).ConfigureAwait(false);
+            Assert.AreNotSame(messageTask, completed, failureMessage);
+        }
+
+        private static ServiceProvider BuildFullRoutingServices(
+            FullRoutingRecorder recorder,
+            Action<MqttRoutingOptions> configure = null)
         {
             return new ServiceCollection()
                 .AddLogging(builder => builder.AddDebug())
@@ -408,6 +577,7 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                 .AddMqttControllers<FullRoutingController>(options =>
                 {
                     options.WithJsonSerializerContext(TestJsonContext.Default);
+                    configure?.Invoke(options);
                 })
                 .BuildServiceProvider();
         }
@@ -611,6 +781,12 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                 return Suppress();
             }
 
+            [MqttRoute("filters/throw")]
+            public MqttResult ThrowForFilter()
+            {
+                throw new InvalidOperationException("filter exception test");
+            }
+
             [MqttRoute("{deviceId}/mode/{mode}/{revision:long?}")]
             public Task TypedRoute(Guid deviceId, DeviceMode mode, long? revision)
             {
@@ -667,6 +843,21 @@ namespace MQTTnet.AspNetCore.Routing.Tests
 
         public sealed class SlimRoutingRecorder : RouteRecorder<SlimRouteRecord>
         {
+        }
+
+        public sealed class FilterRecorder : RouteRecorder<string>
+        {
+            private int _sequence;
+            private readonly ConcurrentQueue<string> _events = new ConcurrentQueue<string>();
+
+            public IReadOnlyCollection<string> Events => _events.ToArray();
+
+            public void RecordEvent(string key)
+            {
+                var value = $"{Interlocked.Increment(ref _sequence)}:{key}";
+                _events.Enqueue(value);
+                Record(key, value);
+            }
         }
 
         public class RouteRecorder<TRecord>
@@ -787,6 +978,104 @@ namespace MQTTnet.AspNetCore.Routing.Tests
         {
             Offline,
             Online
+        }
+
+        private sealed class RejectingAuthorizationFilter : IMqttAuthorizationFilter
+        {
+            private readonly FilterRecorder _recorder;
+
+            public RejectingAuthorizationFilter(FilterRecorder recorder)
+            {
+                _recorder = recorder;
+            }
+
+            public ValueTask OnAuthorizationAsync(MqttAuthorizationFilterContext context)
+            {
+                _recorder.RecordEvent("authorization");
+                context.Result = new MqttRejectResult(MqttPubAckReasonCode.NotAuthorized);
+                return ValueTask.CompletedTask;
+            }
+        }
+
+        private sealed class RecordingActionFilter : IMqttActionFilter
+        {
+            private readonly FilterRecorder _recorder;
+
+            public RecordingActionFilter(FilterRecorder recorder)
+            {
+                _recorder = recorder;
+            }
+
+            public async ValueTask<MqttActionExecutedContext> OnActionExecutionAsync(
+                MqttActionExecutingContext context,
+                MqttActionExecutionDelegate next)
+            {
+                _recorder.RecordEvent("action-before");
+                var executed = await next().ConfigureAwait(false);
+                _recorder.RecordEvent("action-after");
+                return executed;
+            }
+        }
+
+        private sealed class RecordingResourceFilter : IMqttResourceFilter
+        {
+            private readonly FilterRecorder _recorder;
+
+            public RecordingResourceFilter(FilterRecorder recorder)
+            {
+                _recorder = recorder;
+            }
+
+            public async ValueTask<MqttResourceExecutedContext> OnResourceExecutionAsync(
+                MqttResourceExecutingContext context,
+                MqttResourceExecutionDelegate next)
+            {
+                _recorder.RecordEvent("resource-before");
+                var executed = await next().ConfigureAwait(false);
+                _recorder.RecordEvent("resource-after");
+                return executed;
+            }
+        }
+
+        private sealed class AcknowledgeExceptionFilter : IMqttExceptionFilter
+        {
+            private readonly FilterRecorder _recorder;
+
+            public AcknowledgeExceptionFilter(FilterRecorder recorder)
+            {
+                _recorder = recorder;
+            }
+
+            public ValueTask OnExceptionAsync(MqttExceptionContext context)
+            {
+                _recorder.RecordEvent("exception-handled");
+                context.ExceptionHandled = true;
+                context.Result = new MqttAcknowledgeResult("exception handled by test filter");
+                return ValueTask.CompletedTask;
+            }
+        }
+
+        private sealed class SuppressAcknowledgeResultFilter : IMqttResultFilter
+        {
+            private readonly FilterRecorder _recorder;
+
+            public SuppressAcknowledgeResultFilter(FilterRecorder recorder)
+            {
+                _recorder = recorder;
+            }
+
+            public ValueTask<MqttResultExecutedContext> OnResultExecutionAsync(
+                MqttResultExecutingContext context,
+                MqttResultExecutionDelegate next)
+            {
+                if (context.Result is MqttAcknowledgeResult)
+                {
+                    _recorder.RecordEvent("result-replaced");
+                    context.Result = new MqttSuppressResult("replaced by test result filter");
+                }
+
+                return next();
+            }
         }
 
         [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]

@@ -162,6 +162,69 @@ namespace MQTTnet.AspNetCore.Routing
             return opt;
         }
 
+        /// <summary>
+        /// 注册全局 MQTT filter 类型。
+        /// </summary>
+        /// <typeparam name="TFilter">filter 类型。</typeparam>
+        /// <param name="opt">MQTT routing 配置。</param>
+        /// <param name="order">排序值；数值越小越先进入管线。</param>
+        public static MqttRoutingOptions AddMqttFilter<
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+            TFilter>(this MqttRoutingOptions opt, int order = 0)
+            where TFilter : IMqttFilterMetadata
+        {
+            if (opt == null)
+            {
+                throw new ArgumentNullException(nameof(opt));
+            }
+
+            opt.Filters.Add(new MqttFilterModel(typeof(TFilter), order: order));
+            return opt;
+        }
+
+        /// <summary>
+        /// 注册全局 MQTT filter 实例。
+        /// </summary>
+        /// <param name="opt">MQTT routing 配置。</param>
+        /// <param name="filter">filter 实例。</param>
+        /// <param name="order">排序值；数值越小越先进入管线。</param>
+        public static MqttRoutingOptions AddMqttFilter(
+            this MqttRoutingOptions opt,
+            IMqttFilterMetadata filter,
+            int order = 0)
+        {
+            if (opt == null)
+            {
+                throw new ArgumentNullException(nameof(opt));
+            }
+
+            if (filter == null)
+            {
+                throw new ArgumentNullException(nameof(filter));
+            }
+
+            opt.Filters.Add(new MqttFilterModel(filter, order));
+            return opt;
+        }
+
+        /// <summary>
+        /// 配置 MQTT payload 大小上限。
+        /// </summary>
+        /// <param name="opt">MQTT routing 配置。</param>
+        /// <param name="maxPayloadSizeBytes">payload 最大字节数；为空或小于 0 时不限制。</param>
+        public static MqttRoutingOptions WithMaxPayloadSize(
+            this MqttRoutingOptions opt,
+            long? maxPayloadSizeBytes)
+        {
+            if (opt == null)
+            {
+                throw new ArgumentNullException(nameof(opt));
+            }
+
+            opt.MaxPayloadSizeBytes = maxPayloadSizeBytes;
+            return opt;
+        }
+
         public static MqttRoutingOptions FromAssemblies(this MqttRoutingOptions opt, params Assembly[] assemblies)
         {
             opt.FromAssemblies = assemblies;
@@ -239,6 +302,10 @@ namespace MQTTnet.AspNetCore.Routing
             opt.InputFormatters.Add(new MqttJsonPayloadInputFormatter());
             opt.OutputFormatters.Add(new MqttBinaryPayloadOutputFormatter());
             opt.OutputFormatters.Add(new MqttJsonPayloadOutputFormatter());
+            opt.Filters.Add(new MqttFilterModel(new MqttPayloadSizeLimitFilter()));
+            opt.Filters.Add(new MqttFilterModel(new MqttRoutingMetricsFilter()));
+            opt.Filters.Add(new MqttFilterModel(new MqttModelStateInvalidFilter()));
+            opt.Filters.Add(new MqttFilterModel(new MqttExceptionToResultFilter()));
             options?.Invoke(opt);
             return opt;
         }
@@ -248,6 +315,8 @@ namespace MQTTnet.AspNetCore.Routing
             services.AddSingleton<ITypeActivatorCache>(new TypeActivatorCache());
             services.AddSingleton<MqttActionParameterBinder>();
             services.AddSingleton<MqttActionResultExecutor>();
+            services.AddSingleton<MqttFilterProvider>();
+            services.AddSingleton<MqttFilterPipeline>();
             services.AddTransient<MqttRouter>();
             if (options.RouteInvocationInterceptor != null)
             {

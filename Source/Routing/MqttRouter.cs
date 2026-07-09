@@ -20,8 +20,8 @@ namespace MQTTnet.AspNetCore.Routing
         private readonly ILogger<MqttRouter> logger;
         private readonly MqttRouteTable routeTable;
         private readonly ITypeActivatorCache typeActivator;
-        private readonly MqttActionParameterBinder parameterBinder;
-        private readonly MqttActionResultExecutor actionResultExecutor;
+        private readonly MqttFilterProvider filterProvider;
+        private readonly MqttFilterPipeline filterPipeline;
         private readonly MqttRoutingOptions options;
 
         public MqttServer? Server { get; set; }
@@ -30,15 +30,15 @@ namespace MQTTnet.AspNetCore.Routing
             ILogger<MqttRouter> logger,
             MqttRouteTable routeTable,
             ITypeActivatorCache typeActivator,
-            MqttActionParameterBinder parameterBinder,
-            MqttActionResultExecutor actionResultExecutor,
+            MqttFilterProvider filterProvider,
+            MqttFilterPipeline filterPipeline,
             MqttRoutingOptions options)
         {
             this.logger = logger;
             this.routeTable = routeTable;
             this.typeActivator = typeActivator;
-            this.parameterBinder = parameterBinder;
-            this.actionResultExecutor = actionResultExecutor;
+            this.filterProvider = filterProvider;
+            this.filterPipeline = filterPipeline;
             this.options = options;
         }
 
@@ -144,77 +144,25 @@ namespace MQTTnet.AspNetCore.Routing
                                 context.ApplicationMessage.Topic,
                                 controllerContext.ModelState.ErrorCount);
 
-                            context.ProcessPublish = false;
+                            var filters = filterProvider.GetFilters(actionContext, scope.ServiceProvider);
+                            await filterPipeline
+                                .ExecuteResultAsync(
+                                    actionContext,
+                                    filters,
+                                    new MqttRejectResult(MQTTnet.Protocol.MqttPubAckReasonCode.PayloadFormatInvalid))
+                                .ConfigureAwait(false);
                             return;
                         }
                     }
                     var handler = routeContext.Handler ?? throw new InvalidOperationException("Matched MQTT route does not have an action handler.");
-                    ParameterInfo[] parameters = handler.GetParameters();
 
                     context.ProcessPublish = true;
-
-                    try
-                    {
-                        object?[]? paramArray = null;
-
-                        if (parameters.Length > 0)
-                        {
-                            paramArray = await parameterBinder
-                                .BindAsync(parameters, actionContext)
-                                .ConfigureAwait(false);
-                        }
-
-                        var returnValue = HandlerInvoker(handler, classInstance, paramArray);
-                        await actionResultExecutor
-                            .ExecuteAsync(handler.ReturnType, returnValue, actionContext)
-                            .ConfigureAwait(false);
-                    }
-                    catch (MqttBindingException ex)
-                    {
-                        logger.LogDebug(
-                            ex,
-                            "MQTT action binding failed for topic '{Topic}' with {ErrorCount} model state error(s).",
-                            context.ApplicationMessage.Topic,
-                            ex.ModelState.ErrorCount);
-
-                        context.ProcessPublish = false;
-                    }
-                    catch (ArgumentException ex)
-                    {
-                        logger.LogError(ex, $"Unable to match route parameters to all arguments. See inner exception for details.");
-
-                        context.ProcessPublish = false;
-                    }
-                    catch (TargetInvocationException ex) when (ex.InnerException is MqttBindingException bindingException)
-                    {
-                        logger.LogDebug(
-                            bindingException,
-                            "MQTT action binding failed for topic '{Topic}' with {ErrorCount} model state error(s).",
-                            context.ApplicationMessage.Topic,
-                            bindingException.ModelState.ErrorCount);
-
-                        context.ProcessPublish = false;
-                    }
-                    catch (TargetInvocationException ex)
-                    {
-                        logger.LogError(ex.InnerException, $"Unhandled MQTT action exception. See inner exception for details.");
-
-                        // This is an unandled exception from the invoked action
-                        context.ProcessPublish = false;
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "Unable to invoke Mqtt Action.  See inner exception for details.");
-
-                        context.ProcessPublish = false;
-                    }
+                    var routeFilters = filterProvider.GetFilters(actionContext, scope.ServiceProvider);
+                    await filterPipeline
+                        .InvokeAsync(actionContext, routeFilters, classInstance, handler)
+                        .ConfigureAwait(false);
                 }
             }
-        }
-
-        private static object? HandlerInvoker(MethodInfo method, object instance, object?[]? parameters)
-        {
-            return method.Invoke(instance, parameters);
         }
 
         private static bool TryBindControllerRouteProperties(

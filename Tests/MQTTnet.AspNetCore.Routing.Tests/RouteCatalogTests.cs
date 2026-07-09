@@ -30,6 +30,11 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             var r3Action = controller.Actions.Single(action => action.Name == nameof(CatalogController.R3Binding));
             var r3Route = catalog.Routes.Single(route => route.Template == "catalog/devices/{deviceId:guid}/r3");
             var r3PayloadParameter = r3Action.Parameters.Single(parameter => parameter.Name == "payload");
+            var controllerFilter = (CatalogFilterAttribute)controller.Filters.Single().FilterInstance;
+            var actionFilter = (CatalogFilterAttribute)telemetryAction.Filters.Single().FilterInstance;
+            var routeFilters = telemetryRoute.Filters
+                .Select(filter => (CatalogFilterAttribute)filter.FilterInstance)
+                .ToArray();
             var snapshot = catalog.CreateSnapshot();
 
             Assert.IsFalse(catalog.HasErrors);
@@ -54,6 +59,9 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.AreEqual("json", r3Route.DeclaredPayloadFormatterName);
             Assert.AreEqual("application/vnd.catalog+json", r3PayloadParameter.DeclaredContentType);
             Assert.AreEqual("json", r3PayloadParameter.FormatterName);
+            Assert.AreEqual("controller", controllerFilter.Name);
+            Assert.AreEqual("action", actionFilter.Name);
+            CollectionAssert.AreEqual(new[] { "controller", "action" }, routeFilters.Select(filter => filter.Name).ToArray());
             CollectionAssert.Contains(deviceIdParameter.RouteConstraints.ToArray(), "guid");
             StringAssert.Contains(snapshot, "ControllerAction catalog/devices/{deviceId:guid}/telemetry");
             StringAssert.Contains(snapshot, "payload=CatalogPayload");
@@ -149,9 +157,11 @@ namespace MQTTnet.AspNetCore.Routing.Tests
 
         [MqttController]
         [MqttRoute("catalog/devices")]
+        [CatalogFilter("controller", -10)]
         private sealed class CatalogController
         {
             [MqttRoute("{deviceId:guid}/telemetry")]
+            [CatalogFilter("action", 10)]
             public Task Telemetry(Guid deviceId, [FromPayload] CatalogPayload payload)
             {
                 return Task.CompletedTask;
@@ -171,6 +181,27 @@ namespace MQTTnet.AspNetCore.Routing.Tests
                 [FromMqttSession("tenant")] string tenant,
                 MqttRequestContext requestContext)
             {
+            }
+        }
+
+        [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
+        private sealed class CatalogFilterAttribute : Attribute, IMqttActionFilter, IOrderedMqttFilter
+        {
+            public CatalogFilterAttribute(string name, int order)
+            {
+                Name = name;
+                Order = order;
+            }
+
+            public string Name { get; }
+
+            public int Order { get; }
+
+            public ValueTask<MqttActionExecutedContext> OnActionExecutionAsync(
+                MqttActionExecutingContext context,
+                MqttActionExecutionDelegate next)
+            {
+                return next();
             }
         }
 
