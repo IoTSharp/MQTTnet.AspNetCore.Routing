@@ -53,4 +53,13 @@ public class MqttRoutingOptions
     /// 可选 payload 大小上限。为空或小于 0 时不限制。
     /// </summary>
     public long? MaxPayloadSizeBytes { get; set; }
+
+    /// <summary>
+    /// 控制 MQTT topic literal route 匹配是否区分大小写。默认值保持历史行为：不区分大小写。
+    /// </summary>
+    public bool CaseSensitiveTopicMatching { get; set; }
+
+    internal StringComparer TopicSegmentComparer => CaseSensitiveTopicMatching
+        ? StringComparer.Ordinal
+        : StringComparer.OrdinalIgnoreCase;
 }

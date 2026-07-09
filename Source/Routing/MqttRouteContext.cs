@@ -43,5 +43,7 @@ namespace MQTTnet.AspNetCore.Routing
         public bool HaveControllerParameter { get; internal set; }
         public RouteTemplate ControllerTemplate { get; internal set; }
         public MqttRouteModel RouteModel { get; internal set; }
+        public PropertyInfo[] ControllerContextProperties { get; internal set; } = Array.Empty<PropertyInfo>();
+        public MqttControllerRoutePropertyBinder[] ControllerRoutePropertyBinders { get; internal set; } = Array.Empty<MqttControllerRoutePropertyBinder>();
     }
 }

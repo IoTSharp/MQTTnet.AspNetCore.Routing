@@ -7,7 +7,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
-using System.Linq;
 using System.Reflection;
 
 namespace MQTTnet.AspNetCore.Routing
@@ -52,23 +51,41 @@ namespace MQTTnet.AspNetCore.Routing
         public RouteTemplate ControllerTemplate { get; internal set; }
         public bool HaveControllerParameter { get; internal set; }
         public MqttRouteModel RouteModel { get; }
+        public PropertyInfo[] ControllerContextProperties { get; internal set; } = Array.Empty<PropertyInfo>();
+        public MqttControllerRoutePropertyBinder[] ControllerRoutePropertyBinders { get; internal set; } = Array.Empty<MqttControllerRoutePropertyBinder>();
 
-        internal void Match(MqttRouteMatchContext context)
+        internal bool HasLiteralFirstSegment(out string literal)
+        {
+            if (Template.Segments.Count > 0 && !Template.Segments[0].IsParameter)
+            {
+                literal = Template.Segments[0].Value;
+                return true;
+            }
+
+            literal = null;
+            return false;
+        }
+
+        internal void Match(MqttRouteMatchContext context, StringComparer topicSegmentComparer)
         {
             string catchAllValue = null;
+            var templateSegments = Template.Segments;
+            var templateSegmentCount = templateSegments.Count;
+            var topicSegments = context.Segments;
+            var topicSegmentCount = topicSegments.Length;
 
             // If this template contains a catch-all parameter, we can concatenate the pathSegments at and beyond the
             // catch-all segment's position. For example:
             // Template:        /foo/bar/{*catchAll}
             // PathSegments:    /foo/bar/one/two/three
-            if (Template.ContainsCatchAllSegment && context.Segments.Count() >= Template.Segments.Count())
+            if (Template.ContainsCatchAllSegment && topicSegmentCount >= templateSegmentCount)
             {
-                catchAllValue = string.Join("/", context.Segments.Where((segment, id) => id >= Template.Segments.Count() - 1));
+                catchAllValue = string.Join("/", topicSegments, templateSegmentCount - 1, topicSegmentCount - templateSegmentCount + 1);
             }
 
             // If there are no optional segments on the route and the length of the route and the template do not match,
             // then there is no chance of this matching and we can bail early.
-            else if (Template.OptionalSegmentsCount == 0 && Template.Segments.Count() != context.Segments.Count())
+            else if (Template.OptionalSegmentsCount == 0 && templateSegmentCount != topicSegmentCount)
             {
                 return;
             }
@@ -77,9 +94,9 @@ namespace MQTTnet.AspNetCore.Routing
             Dictionary<string, object> parameters = null;
             var numMatchingSegments = 0;
 
-            for (var i = 0; i < Template.Segments.Count(); i++)
+            for (var i = 0; i < templateSegmentCount; i++)
             {
-                var segment = Template.Segments[i];
+                var segment = templateSegments[i];
 
                 if (segment.IsCatchAll)
                 {
@@ -93,7 +110,7 @@ namespace MQTTnet.AspNetCore.Routing
                 // This can happen in one of two cases: // (1) If we are comparing a literal route with a literal
                 // template and the route is shorter than the template. (2) If we are comparing a template where the
                 // last value is an optional parameter that the route does not provide.
-                if (i >= context.Segments.Count())
+                if (i >= topicSegmentCount)
                 {
                     // If we are under condition (1) above then we can stop evaluating matches on the rest of this template.
                     if (!segment.IsParameter && !segment.IsOptional)
@@ -104,12 +121,12 @@ namespace MQTTnet.AspNetCore.Routing
 
                 string pathSegment = null;
 
-                if (i < context.Segments.Count())
+                if (i < topicSegmentCount)
                 {
-                    pathSegment = context.Segments[i];
+                    pathSegment = topicSegments[i];
                 }
 
-                if (!segment.Match(pathSegment, out var matchedParameterValue))
+                if (!segment.Match(pathSegment, topicSegmentComparer, out var matchedParameterValue))
                 {
                     break;
                 }
@@ -145,12 +162,12 @@ namespace MQTTnet.AspNetCore.Routing
             // to choose Route 2 over Route 1. Furthermore, literal routes are preferred over parameterized routes. If
             // the two routes below are registered in the route table. Route 1: /users/1 Route 2: /users/{id:int} And
             // the provided route is `/users/1`. We want to choose Route 1 over Route 2.
-            var allRouteSegmentsMatch = numMatchingSegments >= context.Segments.Count();
+            var allRouteSegmentsMatch = numMatchingSegments >= topicSegmentCount;
 
             // Checking that all route segments have been matches does not suffice if we are comparing literal templates
             // with literal routes. For example, the template `/this/is/a/template` and the route `/this/`. In that
             // case, we want to ensure that all non-optional segments have matched as well.
-            var allNonOptionalSegmentsMatch = numMatchingSegments >= (Template.Segments.Count() - Template.OptionalSegmentsCount);
+            var allNonOptionalSegmentsMatch = numMatchingSegments >= (templateSegmentCount - Template.OptionalSegmentsCount);
 
             if (Template.ContainsCatchAllSegment || (allRouteSegmentsMatch && allNonOptionalSegmentsMatch))
             {
@@ -160,7 +177,29 @@ namespace MQTTnet.AspNetCore.Routing
                 context.HaveControllerParameter = HaveControllerParameter;
                 context.ControllerTemplate = ControllerTemplate;
                 context.RouteModel = RouteModel;
+                context.ControllerContextProperties = ControllerContextProperties;
+                context.ControllerRoutePropertyBinders = ControllerRoutePropertyBinders;
             }
+        }
+    }
+
+    internal sealed class MqttControllerRoutePropertyBinder
+    {
+        private readonly PropertyInfo _property;
+
+        public MqttControllerRoutePropertyBinder(string routeValueName, PropertyInfo property)
+        {
+            RouteValueName = routeValueName;
+            _property = property;
+        }
+
+        public string RouteValueName { get; }
+
+        public Type PropertyType => _property.PropertyType;
+
+        public void SetValue(object controller, object value)
+        {
+            _property.SetValue(controller, value);
         }
     }
 }

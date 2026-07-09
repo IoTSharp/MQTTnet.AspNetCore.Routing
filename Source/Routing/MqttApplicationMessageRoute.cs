@@ -48,7 +48,14 @@ namespace MQTTnet.AspNetCore.Routing
 
         public bool TryMatch(string topic, out IReadOnlyDictionary<string, string> routeValues)
         {
-            var topicSegments = Split(topic);
+            return TryMatch(SplitTopic(topic), StringComparer.OrdinalIgnoreCase, out routeValues);
+        }
+
+        internal bool TryMatch(
+            string[] topicSegments,
+            StringComparer topicSegmentComparer,
+            out IReadOnlyDictionary<string, string> routeValues)
+        {
             if (topicSegments.Length != _segments.Length)
             {
                 routeValues = EmptyRouteValues;
@@ -59,7 +66,7 @@ namespace MQTTnet.AspNetCore.Routing
             for (var i = 0; i < _segments.Length; i++)
             {
                 var templateSegment = _segments[i];
-                var topicSegment = Uri.UnescapeDataString(topicSegments[i]);
+                var topicSegment = topicSegments[i];
                 if (templateSegment.ParameterName != null)
                 {
                     values ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -67,7 +74,7 @@ namespace MQTTnet.AspNetCore.Routing
                     continue;
                 }
 
-                if (!string.Equals(templateSegment.Literal, topicSegment, StringComparison.OrdinalIgnoreCase))
+                if (!topicSegmentComparer.Equals(templateSegment.Literal, topicSegment))
                 {
                     routeValues = EmptyRouteValues;
                     return false;
@@ -76,6 +83,18 @@ namespace MQTTnet.AspNetCore.Routing
 
             routeValues = values == null ? EmptyRouteValues : values;
             return true;
+        }
+
+        internal bool HasLiteralFirstSegment(out string? literal)
+        {
+            if (_segments.Length > 0 && _segments[0].ParameterName == null)
+            {
+                literal = _segments[0].Literal;
+                return true;
+            }
+
+            literal = null;
+            return false;
         }
 
         public abstract ValueTask InvokeAsync(MqttApplicationMessageRouteContext context);
@@ -152,6 +171,17 @@ namespace MQTTnet.AspNetCore.Routing
         private static string[] Split(string value)
         {
             return value.Trim('/').Split(Separator, StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        internal static string[] SplitTopic(string topic)
+        {
+            var segments = Split(topic);
+            for (var i = 0; i < segments.Length; i++)
+            {
+                segments[i] = Uri.UnescapeDataString(segments[i]);
+            }
+
+            return segments;
         }
 
         private readonly struct RouteSegment

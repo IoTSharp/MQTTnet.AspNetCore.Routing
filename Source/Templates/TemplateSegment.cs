@@ -149,7 +149,7 @@ namespace MQTTnet.AspNetCore.Routing
             return Value.GetHashCode();
         }
 
-        public bool Match(string pathSegment, out object matchedParameterValue)
+        public bool Match(string pathSegment, StringComparer literalComparer, out object matchedParameterValue)
         {
             if (IsParameter)
             {
@@ -169,7 +169,7 @@ namespace MQTTnet.AspNetCore.Routing
             {
                 matchedParameterValue = null;
 
-                return string.Equals(Value, pathSegment, StringComparison.OrdinalIgnoreCase);
+                return literalComparer.Equals(Value, pathSegment);
             }
         }
     }

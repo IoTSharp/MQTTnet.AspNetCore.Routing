@@ -7,7 +7,6 @@ using MQTTnet.Server;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -83,17 +82,7 @@ namespace MQTTnet.AspNetCore.Routing
 
                     var classInstance = typeActivator.CreateInstance<object>(scope.ServiceProvider, declaringType);
 
-                    // Potential perf improvement is to cache this reflection work in the future.
-                    var activateProperties = declaringType.GetRuntimeProperties()
-                        .Where((property) =>
-                        {
-                            return
-                                property.IsDefined(typeof(MqttControllerContextAttribute)) &&
-                                property.GetIndexParameters().Length == 0 &&
-                                property.SetMethod != null &&
-                                !property.SetMethod.IsStatic;
-                        })
-                        .ToArray();
+                    var activateProperties = routeContext.ControllerContextProperties;
 
                     if (activateProperties.Length == 0)
                     {
@@ -172,34 +161,36 @@ namespace MQTTnet.AspNetCore.Routing
             MqttRouteMatchContext routeContext,
             MqttControllerContext controllerContext)
         {
-            if (routeContext.ControllerTemplate == null || routeContext.Parameters == null)
+            if (routeContext.ControllerTemplate == null ||
+                routeContext.Parameters == null ||
+                routeContext.ControllerRoutePropertyBinders.Length == 0)
             {
                 return true;
             }
 
-            foreach (var templateSegment in routeContext.ControllerTemplate.Segments.Where(p => p.IsParameter))
+            var binders = routeContext.ControllerRoutePropertyBinders;
+            for (var i = 0; i < binders.Length; i++)
             {
-                var property = declaringType.GetRuntimeProperty(templateSegment.Value);
-                if (property?.SetMethod == null ||
-                    !routeContext.Parameters.TryGetValue(templateSegment.Value, out var routeValue))
+                var binder = binders[i];
+                if (!routeContext.Parameters.TryGetValue(binder.RouteValueName, out var routeValue))
                 {
                     continue;
                 }
 
                 if (!MqttRouteValueConverter.TryConvert(
                         routeValue,
-                        property.PropertyType,
+                        binder.PropertyType,
                         out var convertedValue,
                         out var errorMessage))
                 {
                     controllerContext.ModelState.AddModelError(
-                        templateSegment.Value,
+                        binder.RouteValueName,
                         MqttBindingErrorCode.TypeConversionFailed,
                         errorMessage ?? "Route value conversion failed.");
                     return false;
                 }
 
-                property.SetValue(classInstance, convertedValue);
+                binder.SetValue(classInstance, convertedValue);
             }
 
             return true;

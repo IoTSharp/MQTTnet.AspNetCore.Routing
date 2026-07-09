@@ -45,6 +45,36 @@ namespace MQTTnet.AspNetCore.Routing
             return services.AddMqttControllers<TController>(_ => { });
         }
 
+        /// <summary>
+        /// 显式注册一组 MQTT controller 类型，避免默认 assembly scan。
+        /// </summary>
+        /// <param name="services">服务集合。</param>
+        /// <param name="controllerTypes">要注册的 controller 类型。</param>
+        [RequiresUnreferencedCode("Controller type arrays cannot be statically analyzed. Prefer AddMqttControllers<TController> or a source-generated catalog for Native AOT applications.")]
+        public static IServiceCollection AddMqttControllers(this IServiceCollection services, params Type[] controllerTypes)
+        {
+            return services.AddMqttControllers(controllerTypes, _ => { });
+        }
+
+        /// <summary>
+        /// 显式注册一组 MQTT controller 类型，并配置 routing 选项。
+        /// </summary>
+        /// <param name="services">服务集合。</param>
+        /// <param name="controllerTypes">要注册的 controller 类型。</param>
+        /// <param name="options">routing 配置委托。</param>
+        [RequiresUnreferencedCode("Controller type arrays cannot be statically analyzed. Prefer AddMqttControllers<TController> or a source-generated catalog for Native AOT applications.")]
+        public static IServiceCollection AddMqttControllers(
+            this IServiceCollection services,
+            Type[] controllerTypes,
+            Action<MqttRoutingOptions> options)
+        {
+            return services.AddMqttControllers(opt =>
+            {
+                opt.ControllerTypes = controllerTypes;
+                options?.Invoke(opt);
+            });
+        }
+
         public static IServiceCollection AddMqttControllers<[DynamicallyAccessedMembers(ControllerMemberTypes)] TController>(
             this IServiceCollection services,
             Action<MqttRoutingOptions> options)
@@ -53,7 +83,7 @@ namespace MQTTnet.AspNetCore.Routing
             var mqttRoutingOptions = CreateOptions(options);
 
             services.AddSingleton(mqttRoutingOptions);
-            services.AddSingleton(_ => MqttRouteTableFactory.CreateFromControllerType(typeof(TController)));
+            services.AddSingleton(_ => MqttRouteTableFactory.CreateFromControllerType(typeof(TController), mqttRoutingOptions.TopicSegmentComparer));
             services.AddSingleton(serviceProvider => serviceProvider.GetRequiredService<MqttRouteTable>().Catalog);
 
             AddMqttRoutingServices(services, mqttRoutingOptions);
@@ -83,7 +113,7 @@ namespace MQTTnet.AspNetCore.Routing
                         throw new ArgumentException("'controllerTypes' cannot be an empty array. Pass null or a collection of 1 or more controller types.", nameof(controllerTypes));
                     }
 
-                    return MqttRouteTableFactory.CreateFromControllerTypes(controllerTypes);
+                    return MqttRouteTableFactory.CreateFromControllerTypes(controllerTypes, _opt.TopicSegmentComparer);
                 }
 
                 var fromAssemblies = _opt.FromAssemblies;
@@ -93,7 +123,7 @@ namespace MQTTnet.AspNetCore.Routing
                 }
                 var assemblies = fromAssemblies ?? new[] { Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly() };
 
-                return MqttRouteTableFactory.Create(assemblies);
+                return MqttRouteTableFactory.Create(assemblies, _opt.TopicSegmentComparer);
             });
             services.AddSingleton(serviceProvider => serviceProvider.GetRequiredService<MqttRouteTable>().Catalog);
             
@@ -222,6 +252,24 @@ namespace MQTTnet.AspNetCore.Routing
             }
 
             opt.MaxPayloadSizeBytes = maxPayloadSizeBytes;
+            return opt;
+        }
+
+        /// <summary>
+        /// 配置 MQTT topic literal route 匹配是否区分大小写。
+        /// </summary>
+        /// <param name="opt">MQTT routing 配置。</param>
+        /// <param name="caseSensitive">为 <c>true</c> 时使用 Ordinal 区分大小写匹配；默认 <c>false</c> 保持历史不区分大小写行为。</param>
+        public static MqttRoutingOptions WithCaseSensitiveTopicMatching(
+            this MqttRoutingOptions opt,
+            bool caseSensitive = true)
+        {
+            if (opt == null)
+            {
+                throw new ArgumentNullException(nameof(opt));
+            }
+
+            opt.CaseSensitiveTopicMatching = caseSensitive;
             return opt;
         }
 

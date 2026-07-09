@@ -37,8 +37,15 @@ namespace MQTTnet.AspNetCore.Routing
         [RequiresUnreferencedCode("Assembly scanning cannot be statically analyzed. Use CreateFromControllerTypes for Native AOT applications.")]
         internal static MqttRouteTable Create(IEnumerable<Assembly> assemblies)
         {
+            return Create(assemblies, StringComparer.OrdinalIgnoreCase);
+        }
+
+        [RequiresUnreferencedCode("Assembly scanning cannot be statically analyzed. Use CreateFromControllerTypes for Native AOT applications.")]
+        internal static MqttRouteTable Create(IEnumerable<Assembly> assemblies, StringComparer topicSegmentComparer)
+        {
             var asm = (assemblies ?? new Assembly[] { Assembly.GetExecutingAssembly() }).ToArray();
-            var key = new Key(asm.OrderBy(a => a.FullName).ToArray());
+            topicSegmentComparer ??= StringComparer.OrdinalIgnoreCase;
+            var key = new Key(asm.OrderBy(a => a.FullName).ToArray(), GetComparerCacheKey(topicSegmentComparer));
 
             if (Cache.TryGetValue(key, out var resolvedComponents))
             {
@@ -48,7 +55,7 @@ namespace MQTTnet.AspNetCore.Routing
             var actions = asm.SelectMany(a => a.GetTypes())
                 .SelectMany(GetControllerActions);
 
-            var routeTable = Create(CreateApplicationModel(actions));
+            var routeTable = Create(CreateApplicationModel(actions), topicSegmentComparer);
 
             Cache.TryAdd(key, routeTable);
 
@@ -58,10 +65,16 @@ namespace MQTTnet.AspNetCore.Routing
         [RequiresUnreferencedCode("Controller type arrays cannot be statically analyzed. Use CreateFromControllerType<TController> for Native AOT applications.")]
         internal static MqttRouteTable CreateFromControllerTypes(IEnumerable<Type> controllerTypes)
         {
+            return CreateFromControllerTypes(controllerTypes, StringComparer.OrdinalIgnoreCase);
+        }
+
+        [RequiresUnreferencedCode("Controller type arrays cannot be statically analyzed. Use CreateFromControllerType<TController> for Native AOT applications.")]
+        internal static MqttRouteTable CreateFromControllerTypes(IEnumerable<Type> controllerTypes, StringComparer topicSegmentComparer)
+        {
             var actions = controllerTypes
                 .SelectMany(GetControllerActions);
 
-            return Create(CreateApplicationModel(actions));
+            return Create(CreateApplicationModel(actions), topicSegmentComparer);
         }
 
         internal static MqttRouteTable CreateFromControllerType<[DynamicallyAccessedMembers(ControllerMemberTypes)] TController>()
@@ -72,6 +85,13 @@ namespace MQTTnet.AspNetCore.Routing
         internal static MqttRouteTable CreateFromControllerType(
             [DynamicallyAccessedMembers(ControllerMemberTypes)] Type controllerType)
         {
+            return CreateFromControllerType(controllerType, StringComparer.OrdinalIgnoreCase);
+        }
+
+        internal static MqttRouteTable CreateFromControllerType(
+            [DynamicallyAccessedMembers(ControllerMemberTypes)] Type controllerType,
+            StringComparer topicSegmentComparer)
+        {
             var actions = Array.Empty<MethodInfo>();
             if (controllerType.GetCustomAttribute(typeof(MqttControllerAttribute), true) != null)
             {
@@ -80,7 +100,7 @@ namespace MQTTnet.AspNetCore.Routing
                     .ToArray();
             }
 
-            return Create(CreateApplicationModel(actions.Select(action => new MqttControllerAction(action, controllerType))));
+            return Create(CreateApplicationModel(actions.Select(action => new MqttControllerAction(action, controllerType))), topicSegmentComparer);
         }
 
         internal static MqttRouteTable Create(IEnumerable<MqttControllerAction> actions)
@@ -245,6 +265,11 @@ namespace MQTTnet.AspNetCore.Routing
 
         internal static MqttRouteTable Create(MqttApplicationModel applicationModel)
         {
+            return Create(applicationModel, StringComparer.OrdinalIgnoreCase);
+        }
+
+        internal static MqttRouteTable Create(MqttApplicationModel applicationModel, StringComparer topicSegmentComparer)
+        {
             var catalogBeforeSorting = new MqttRouteCatalog(applicationModel);
             catalogBeforeSorting.ThrowIfErrors();
 
@@ -268,10 +293,14 @@ namespace MQTTnet.AspNetCore.Routing
                     routeModel.UnusedRouteParameterNames,
                     routeModel.ControllerType,
                     routeModel);
+                entry.ControllerContextProperties = CreateControllerContextProperties(routeModel.ControllerType);
                 if (routeModel.ParsedControllerTemplate != null)
                 {
                     entry.ControllerTemplate = routeModel.ParsedControllerTemplate;
                     entry.HaveControllerParameter = entry.ControllerTemplate.Segments.Any(c => c.IsParameter);
+                    entry.ControllerRoutePropertyBinders = CreateControllerRoutePropertyBinders(
+                        routeModel.ControllerType,
+                        entry.ControllerTemplate);
                 }
 
                 routes.Add(entry);
@@ -284,7 +313,46 @@ namespace MQTTnet.AspNetCore.Routing
                     .Where(route => route.RouteModel != null)
                     .Select(route => route.RouteModel),
                 catalogBeforeSorting.Diagnostics);
-            return new MqttRouteTable(sortedRoutes, catalog);
+            return new MqttRouteTable(sortedRoutes, catalog, topicSegmentComparer);
+        }
+
+        private static PropertyInfo[] CreateControllerContextProperties(
+            [DynamicallyAccessedMembers(ControllerMemberTypes)]
+            Type controllerType)
+        {
+            return controllerType.GetRuntimeProperties()
+                .Where(property =>
+                    property.IsDefined(typeof(MqttControllerContextAttribute)) &&
+                    property.GetIndexParameters().Length == 0 &&
+                    property.SetMethod != null &&
+                    !property.SetMethod.IsStatic)
+                .ToArray();
+        }
+
+        private static MqttControllerRoutePropertyBinder[] CreateControllerRoutePropertyBinders(
+            [DynamicallyAccessedMembers(ControllerMemberTypes)]
+            Type controllerType,
+            RouteTemplate controllerTemplate)
+        {
+            var binders = new List<MqttControllerRoutePropertyBinder>();
+            for (var i = 0; i < controllerTemplate.Segments.Count; i++)
+            {
+                var segment = controllerTemplate.Segments[i];
+                if (!segment.IsParameter)
+                {
+                    continue;
+                }
+
+                var property = controllerType.GetRuntimeProperty(segment.Value);
+                if (property?.SetMethod == null)
+                {
+                    continue;
+                }
+
+                binders.Add(new MqttControllerRoutePropertyBinder(segment.Value, property));
+            }
+
+            return binders.ToArray();
         }
 
         private static void AddControllerRouteModel(
@@ -576,6 +644,11 @@ namespace MQTTnet.AspNetCore.Routing
                 .ToArray();
         }
 
+        private static string GetComparerCacheKey(StringComparer comparer)
+        {
+            return comparer.Equals("a", "A") ? "OrdinalIgnoreCase" : "Ordinal";
+        }
+
         /// <summary>
         /// Given a route template string suchs a "[controller]/[action]" replace the tokens with the values provided.
         /// /// Controllers with a suffix of "Controller" will be chopped to exclude the word Controller from the
@@ -718,28 +791,34 @@ namespace MQTTnet.AspNetCore.Routing
         private readonly struct Key : IEquatable<Key>
         {
             public readonly Assembly[] Assemblies;
+            public readonly string ComparerKey;
 
-            public Key(Assembly[] assemblies)
+            public Key(Assembly[] assemblies, string comparerKey)
             {
                 Assemblies = assemblies;
+                ComparerKey = comparerKey;
             }
 
             public override bool Equals(object obj)
             {
-                return obj is Key other ? base.Equals(other) : false;
+                return obj is Key other && Equals(other);
             }
 
             public bool Equals(Key other)
             {
                 if (Assemblies == null && other.Assemblies == null)
                 {
-                    return true;
+                    return string.Equals(ComparerKey, other.ComparerKey, StringComparison.Ordinal);
                 }
                 else if ((Assemblies == null) || (other.Assemblies == null))
                 {
                     return false;
                 }
                 else if (Assemblies.Length != other.Assemblies.Length)
+                {
+                    return false;
+                }
+                else if (!string.Equals(ComparerKey, other.ComparerKey, StringComparison.Ordinal))
                 {
                     return false;
                 }
@@ -767,6 +846,7 @@ namespace MQTTnet.AspNetCore.Routing
                     }
                 }
 
+                hash.Add(ComparerKey, StringComparer.Ordinal);
                 return hash.ToHashCode();
             }
         }

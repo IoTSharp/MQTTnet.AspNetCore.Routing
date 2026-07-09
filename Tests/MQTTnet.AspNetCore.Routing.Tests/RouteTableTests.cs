@@ -1,6 +1,7 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace MQTTnet.AspNetCore.Routing.Tests
 {
@@ -217,6 +218,111 @@ namespace MQTTnet.AspNetCore.Routing.Tests
             Assert.IsNotNull(MockMethod2);
             Assert.AreNotSame(MockMethod, MockMethod2);
             Assert.IsNull(context.Handler);
+        }
+
+        [TestMethod]
+        public void Route_FirstSegmentIndexPreservesRouteOrder()
+        {
+            var catchAllMethod = typeof(RouteTableTests).GetMethod(nameof(Route_Match));
+            var literalMethod = typeof(RouteTableTests).GetMethod(nameof(Route_Constructor));
+            var routes = new[]
+            {
+                new MqttRoute(
+                    new RouteTemplate("{*path}", new List<TemplateSegment>
+                    {
+                        new TemplateSegment("{*path}", "*path", true),
+                    }),
+                    catchAllMethod,
+                    Array.Empty<string>(),
+                    typeof(RouteTableTests)),
+                new MqttRoute(
+                    new RouteTemplate("super/cool", new List<TemplateSegment>
+                    {
+                        new TemplateSegment("super/cool", "super", false),
+                        new TemplateSegment("super/cool", "cool", false),
+                    }),
+                    literalMethod,
+                    Array.Empty<string>(),
+                    typeof(RouteTableTests)),
+            };
+            var table = new MqttRouteTable(routes);
+            var context = new MqttRouteMatchContext("super/cool");
+
+            table.Route(context);
+
+            Assert.AreSame(catchAllMethod, context.Handler);
+            Assert.AreEqual("super/cool", context.Parameters["path"]);
+        }
+
+        [TestMethod]
+        public void Route_DefaultMatchingIgnoresLiteralCase()
+        {
+            var method = typeof(RouteTableTests).GetMethod(nameof(Route_Match));
+            var table = new MqttRouteTable(new[]
+            {
+                new MqttRoute(
+                    new RouteTemplate("super/awesome", new List<TemplateSegment>
+                    {
+                        new TemplateSegment("super/awesome", "super", false),
+                        new TemplateSegment("super/awesome", "awesome", false),
+                    }),
+                    method,
+                    Array.Empty<string>(),
+                    typeof(RouteTableTests)),
+            });
+            var context = new MqttRouteMatchContext("SUPER/AWESOME");
+
+            table.Route(context);
+
+            Assert.AreSame(method, context.Handler);
+        }
+
+        [TestMethod]
+        public void Route_CaseSensitiveMatchingRejectsDifferentLiteralCase()
+        {
+            var method = typeof(RouteTableTests).GetMethod(nameof(Route_Match));
+            var table = new MqttRouteTable(
+                new[]
+                {
+                    new MqttRoute(
+                        new RouteTemplate("super/awesome", new List<TemplateSegment>
+                        {
+                            new TemplateSegment("super/awesome", "super", false),
+                            new TemplateSegment("super/awesome", "awesome", false),
+                        }),
+                        method,
+                        Array.Empty<string>(),
+                        typeof(RouteTableTests)),
+                },
+                MqttRouteCatalog.Empty,
+                StringComparer.Ordinal);
+            var context = new MqttRouteMatchContext("SUPER/AWESOME");
+
+            table.Route(context);
+
+            Assert.IsNull(context.Handler);
+        }
+
+        [TestMethod]
+        public void SlimRouteTable_FirstSegmentIndexPreservesRouteOrder()
+        {
+            static ValueTask Handler(MqttApplicationMessageRouteContext context)
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            var parameterRoute = MqttApplicationMessageRoute.Create("{device}/telemetry", Handler);
+            var literalRoute = MqttApplicationMessageRoute.Create("sensor/telemetry", Handler);
+            var table = new MqttApplicationMessageRouteTable(new[] { parameterRoute, literalRoute });
+
+            var matched = table.TryMatch(
+                "sensor/telemetry",
+                out var route,
+                out var routeValues);
+
+            Assert.IsTrue(matched);
+            Assert.AreSame(parameterRoute, route);
+            Assert.AreEqual("sensor", routeValues["device"]);
         }
 
         [TestMethod]
