@@ -9,6 +9,8 @@
 
 MQTTnet AspNetCore Routing  is a fork of  https://github.com/Atlas-LiftTech/MQTTnet.AspNetCore.AttributeRouting
 
+This IoTSharp-maintained fork keeps the original controller-style attribute routing API, and also carries a slim explicit routing path for Native AOT and high-throughput applications. The library stays focused on generic MQTT routing, binding, dispatching, and result/filter extensibility; business topic contracts, authorization models, audit rules, and compatibility policies belong to consuming applications.
+
 This addon to MQTTnet provides the ability to define controllers and use attribute-based routing against message topics in a manner that is very similar to AspNet Core.
 
 ## When should I use this library?
@@ -32,6 +34,10 @@ You can do everything that this addon does directly by using MQTTnet delegates y
 ## Performance Note
 
 This library has not been tested against a very high-load environment yet.  Ensure you do your own load testing prior to use in production.  All performance improvement PRs are welcome.
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for the planned MQTT MVC controller programming model, model binding, result handling, filters, route catalog, compatibility, and performance work.
 
 ## Supported frameworks
 
