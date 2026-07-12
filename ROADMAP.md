@@ -348,7 +348,7 @@ context 应能从 `InterceptingPublishEventArgs` / `MqttApplicationMessageRouteC
 - 消费程序可以通过 filter 实现自己的授权、审计、资源隔离和业务校验。
 - 引入 filter 后,未配置 filter 的现有 controller 行为不变。
 
-### 🧪 R6:性能与 AOT
+### 🚧 R6:性能与 AOT
 
 目标:在模型稳定后减少热路径开销,强化 AOT/trimming。注意:slim 路径已具备 delegate/`JsonTypeInfo` 优势,本阶段重点是把反射路径拉齐或收敛,而非重复实现 slim 已有能力。
 
@@ -358,7 +358,7 @@ context 应能从 `InterceptingPublishEventArgs` / `MqttApplicationMessageRouteC
 - **禁用运行时泛型反射**:activator、binder、return-type executor 一律走注册期强类型委托或 source generator,不得用 `MakeGenericMethod` / `Activator.CreateInstance(Type)` 之类在热路径拆包(承接 R1 转换器与 R4 executor 的 AOT 约束)。
 - route matching:启动时构建 segment index 或 trie,预计算 route precedence,补 catch-all 与 optional segment 测试,大小写规则明确且可配置。
 - formatter:System.Text.Json source generation、formatter selection cache、per-route JSON options/context、binary/text 快路径。
-- 显式注册:`AddMqttControllers<TController>()`、`AddMqttControllers(params Type[])`、source-generated catalog 可行性评估。
+- 显式注册:`AddMqttControllers<TController>()`、`AddMqttControllers(params Type[])`;已交付独立 `MQTTnet.AspNetCore.Routing.SourceGeneration` v1,对 opt-in controller 生成 route、DI 构造与直接 action 委托,后续扩展异步返回、更多绑定源和完整 filter 管线。
 - public API 标注 trimming 相关 attribute,trimming analyzer clean baseline。
 
 验收:

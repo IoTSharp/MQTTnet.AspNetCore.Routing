@@ -33,6 +33,9 @@ services.AddMqttControllers<DeviceController>(options =>
 
 Avoid assembly scanning in Native AOT applications. Assembly scanning APIs are kept for compatibility and are annotated with trimming warnings.
 
+For controller organization without runtime action invocation, use the opt-in
+[`MQTTnet.AspNetCore.Routing.SourceGeneration`](source-generation.md) analyzer. It generates direct DI construction and action delegates; unsupported signatures fail at compile time rather than falling back to reflection.
+
 ## JSON
 
 Use `JsonSerializerContext`:
@@ -45,4 +48,3 @@ public sealed partial class AppJsonContext : JsonSerializerContext
 ```
 
 Then pass it to routing options or slim route registration.
-

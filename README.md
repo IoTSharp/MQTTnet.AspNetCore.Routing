@@ -50,6 +50,7 @@ Focused guides live under [docs](docs/index.md):
 * [Filters](docs/filters.md)
 * [Route catalog and testing](docs/route-catalog-and-testing.md)
 * [Native AOT](docs/aot.md)
+* [Source-generated controller routing](docs/source-generation.md)
 * [Migration](docs/migration.md)
 * [Performance](docs/performance.md)
 

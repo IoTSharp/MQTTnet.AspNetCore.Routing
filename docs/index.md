@@ -11,6 +11,6 @@ This directory documents the generic MQTT routing programming model. The library
 - [Filters](filters.md)
 - [Route catalog and testing](route-catalog-and-testing.md)
 - [Native AOT](aot.md)
+- [Source-generated controller routing](source-generation.md)
 - [Migration](migration.md)
 - [Performance](performance.md)
-

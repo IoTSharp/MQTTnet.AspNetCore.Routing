@@ -33,12 +33,16 @@ class MQTTnet.AspNetCore.Routing.Attributes.FromPayloadAttribute
 class MQTTnet.AspNetCore.Routing.Attributes.MqttControllerContextAttribute
   .ctor()
 
+sealed class MQTTnet.AspNetCore.Routing.Attributes.MqttGeneratedControllerAttribute
+  .ctor()
+
 interface MQTTnet.AspNetCore.Routing.IMqttActionFilter
   method System.Threading.Tasks.ValueTask<MQTTnet.AspNetCore.Routing.MqttActionExecutedContext> OnActionExecutionAsync(MQTTnet.AspNetCore.Routing.MqttActionExecutingContext context, MQTTnet.AspNetCore.Routing.MqttActionExecutionDelegate next)
 
 interface MQTTnet.AspNetCore.Routing.IMqttApplicationMessageDispatcher
   method System.Threading.Tasks.Task<MQTTnet.AspNetCore.Routing.MqttApplicationMessageDispatchResult> DispatchAsync(MQTTnet.MqttApplicationMessage applicationMessage, System.String clientId, System.Threading.CancellationToken cancellationToken)
   method System.Threading.Tasks.Task<MQTTnet.AspNetCore.Routing.MqttApplicationMessageDispatchResult> DispatchAsync(MQTTnet.MqttApplicationMessageReceivedEventArgs eventArgs, System.Threading.CancellationToken cancellationToken)
+  method System.Threading.Tasks.Task<MQTTnet.AspNetCore.Routing.MqttApplicationMessageDispatchResult> DispatchAsync(MQTTnet.Server.InterceptingPublishEventArgs eventArgs, MQTTnet.Server.MqttServer mqttServer, System.Threading.CancellationToken cancellationToken)
 
 interface MQTTnet.AspNetCore.Routing.IMqttAuthorizationFilter
   method System.Threading.Tasks.ValueTask OnAuthorizationAsync(MQTTnet.AspNetCore.Routing.MqttAuthorizationFilterContext context)
@@ -140,6 +144,8 @@ sealed class MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteContext
   property MQTTnet.AspNetCore.Routing.MqttRequestContext RequestContext { get; }
   property MQTTnet.AspNetCore.Routing.MqttRouteContext RouteContext { get; }
   property MQTTnet.MqttApplicationMessage Message { get; }
+  property MQTTnet.Server.InterceptingPublishEventArgs InterceptingPublishContext { get; }
+  property MQTTnet.Server.MqttServer MqttServer { get; }
   property System.Collections.Generic.IReadOnlyDictionary<System.String, System.String> RouteValues { get; }
   property System.IServiceProvider Services { get; }
   property System.String ClientId { get; }
@@ -151,6 +157,7 @@ sealed class MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteContext
 static class MQTTnet.AspNetCore.Routing.MqttApplicationMessageRoutingServiceCollectionExtensions
   static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttApplicationMessageRouting(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteBuilder> configure)
   static method Microsoft.Extensions.DependencyInjection.IServiceCollection AddMqttApplicationMessageSlimRouting(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteBuilder> configure)
+  static method void WithApplicationMessageRouting(MQTTnet.Server.MqttServer server, System.IServiceProvider serviceProvider)
 
 sealed class MQTTnet.AspNetCore.Routing.MqttApplicationModel
   property System.Collections.Generic.IReadOnlyList<MQTTnet.AspNetCore.Routing.MqttControllerModel> Controllers { get; }
@@ -265,6 +272,10 @@ sealed class MQTTnet.AspNetCore.Routing.MqttFilterModel
   property System.Collections.Generic.IReadOnlyList<System.Object> Metadata { get; }
   property System.Int32 Order { get; }
   property System.Type FilterType { get; }
+
+static class MQTTnet.AspNetCore.Routing.MqttGeneratedEndpointHelpers
+  static method System.Threading.Tasks.ValueTask ExecuteResultAsync(MQTTnet.AspNetCore.Routing.MqttResult result, MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteContext context)
+  static method void InitializeController(MQTTnet.AspNetCore.Routing.MqttBaseController controller, MQTTnet.AspNetCore.Routing.MqttApplicationMessageRouteContext context)
 
 enum MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition
   static field MQTTnet.AspNetCore.Routing.MqttInboundPublishDisposition Continue

@@ -11,6 +11,7 @@
 	</ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\..\Source\MQTTnet.AspNetCore.Routing.csproj" />
+		<ProjectReference Include="..\..\SourceGeneration\MQTTnet.AspNetCore.Routing.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 	</ItemGroup>
 	<ItemGroup>
 		<None Include="PublicApi.approved.txt" CopyToOutputDirectory="PreserveNewest" />

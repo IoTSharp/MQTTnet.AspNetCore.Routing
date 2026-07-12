@@ -2,6 +2,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MQTTnet.Server;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,15 +15,18 @@ namespace MQTTnet.AspNetCore.Routing
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly MqttApplicationMessageRouteTable _routeTable;
         private readonly ILogger<MqttApplicationMessageDispatcher>? _logger;
+        private readonly MqttRoutingOptions? _routingOptions;
 
         public MqttApplicationMessageDispatcher(
             IServiceScopeFactory scopeFactory,
             MqttApplicationMessageRouteTable routeTable,
-            ILogger<MqttApplicationMessageDispatcher>? logger = null)
+            ILogger<MqttApplicationMessageDispatcher>? logger = null,
+            MqttRoutingOptions? routingOptions = null)
         {
             _scopeFactory = scopeFactory;
             _routeTable = routeTable;
             _logger = logger;
+            _routingOptions = routingOptions;
         }
 
         public async Task<MqttApplicationMessageDispatchResult> DispatchAsync(
@@ -71,6 +75,41 @@ namespace MQTTnet.AspNetCore.Routing
             eventArgs.IsHandled = result.IsHandled;
             eventArgs.ProcessingFailed = !result.IsHandled;
             return result;
+        }
+
+        public async Task<MqttApplicationMessageDispatchResult> DispatchAsync(
+            InterceptingPublishEventArgs eventArgs,
+            MqttServer mqttServer,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_routeTable.TryMatch(eventArgs.ApplicationMessage.Topic, out var route, out var routeValues) || route == null)
+            {
+                return new MqttApplicationMessageDispatchResult(false);
+            }
+
+            using var scope = _scopeFactory.CreateScope();
+            var context = new MqttApplicationMessageRouteContext(
+                scope.ServiceProvider,
+                eventArgs,
+                mqttServer,
+                routeValues,
+                route.RouteModel,
+                _routingOptions);
+
+            try
+            {
+                await route.InvokeAsync(context).ConfigureAwait(false);
+                return new MqttApplicationMessageDispatchResult(true, context.ModelState);
+            }
+            catch (MqttBindingException ex)
+            {
+                _logger?.LogDebug(
+                    ex,
+                    "MQTT server message binding failed for topic '{Topic}' with {ErrorCount} model state error(s).",
+                    eventArgs.ApplicationMessage.Topic,
+                    ex.ModelState.ErrorCount);
+                return new MqttApplicationMessageDispatchResult(false, ex.ModelState);
+            }
         }
     }
 }

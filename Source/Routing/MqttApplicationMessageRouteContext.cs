@@ -1,6 +1,7 @@
 // Copyright (c) Atlas Lift Tech Inc. All rights reserved.
 
 using MQTTnet;
+using MQTTnet.Server;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -38,6 +39,35 @@ namespace MQTTnet.AspNetCore.Routing
                 services);
         }
 
+        internal MqttApplicationMessageRouteContext(
+            IServiceProvider services,
+            InterceptingPublishEventArgs publishContext,
+            MqttServer mqttServer,
+            IReadOnlyDictionary<string, string> routeValues,
+            MqttRouteModel? routeModel,
+            MqttRoutingOptions? routingOptions)
+        {
+            Services = services;
+            Message = publishContext.ApplicationMessage;
+            ClientId = publishContext.ClientId;
+            RouteValues = routeValues;
+            CancellationToken = publishContext.CancellationToken;
+            InterceptingPublishContext = publishContext;
+            MqttServer = mqttServer;
+            RequestContext = MqttRequestContext.FromInterceptingPublish(publishContext);
+            RouteContext = new MqttRouteContext(
+                routeModel,
+                MqttRouteContext.ToRouteValues(routeValues));
+            ActionContext = new MqttActionContext(
+                RequestContext,
+                RouteContext,
+                ModelState,
+                services,
+                mqttServer: mqttServer,
+                interceptingPublishContext: publishContext,
+                routingOptions: routingOptions);
+        }
+
         public IServiceProvider Services { get; }
 
         public MqttApplicationMessage Message { get; }
@@ -47,6 +77,16 @@ namespace MQTTnet.AspNetCore.Routing
         public IReadOnlyDictionary<string, string> RouteValues { get; }
 
         public CancellationToken CancellationToken { get; }
+
+        /// <summary>
+        /// server publish 拦截上下文；直接分发或 client 路径为空。
+        /// </summary>
+        public InterceptingPublishEventArgs? InterceptingPublishContext { get; }
+
+        /// <summary>
+        /// 当前 MQTT server；直接分发或 client 路径为空。
+        /// </summary>
+        public MqttServer? MqttServer { get; }
 
         /// <summary>
         /// 当前消息的 R3 请求上下文。
