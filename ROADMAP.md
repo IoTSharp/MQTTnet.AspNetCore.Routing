@@ -8,6 +8,7 @@
 
 - `✅` 已具备:当前代码已经有可用基础。
 - `🚧` 进行中:当前路线图、文档或实现正在推进。
+- `🟡` 部分实现:已有切片,完整性能/AOT等验收未闭环。
 - `⬜` 待开始:已确定要做,但还没有实现。
 - `⚠️` 待修复:已有实现存在问题或不足,需要优先修正。
 - `🧪` 验证中:需要设计验证、兼容性验证或性能验证后再固化。
@@ -88,52 +89,21 @@ MQTT routing 也应保持这个分层:
 
 ## 上游关系
 
-本库源自 Atlas Lift Tech 的 `MQTTnet.AspNetCore.Routing`(源码版权头保留)。本路线图的 MVC 化是对上游的一次较大分叉,因此需要先确定分叉策略:
+本库源自 Atlas Lift Tech 的 `MQTTnet.AspNetCore.Routing`(源码版权头保留)。本路线图的 MVC 化是对上游的一次较大分叉,因此分叉策略继续受下文已完成R0决定约束:
 
 - 明确哪些改动可回馈上游,哪些是本仓库长期维护的 patch。
 - public API 变更尽量走 extend-only,降低未来与上游合并的成本。
 - 若决定长期分叉,需在 README 标注,避免使用者误以为与上游 NuGet 包 API 完全一致。
 
-该决策在 R0 收敛,并约束 R1 之后所有 public API 设计。
+R0的已定决策约束后续public API设计；新变更按兼容合同审查，不重新立项原决定。
 
-## 当前基线
+## 当前基线（2026-11-11核查）
 
-### 已具备
+R0～R5及R7的工程实现已具备：收敛决策、Guid/enum/nullable绑定纠正、显式Application Model/Route Catalog、Binding/Result/Filter体系及文档/测试辅助。旧起点中的“尚未决定两套路由分工”和“Guid/enum待修”不再作为当前待办。
 
-- `✅` `[MqttController]` / `[MqttRoute]` / `MqttBaseController`
-- `✅` controller/action discovery,controller route 与 action route 组合
-- `✅` route value 到 action 参数的基础绑定
-- `✅` `[FromPayload]` JSON payload 绑定
-- `✅` `Ok()` / `BadMessage()` 基础结果语义
-- `✅` route invocation interceptor
-- `✅` MVC 风格 filter 管线
-- `✅` 反射式路由(`MqttRouter` + `MqttRouteTable` + `WithAttributeRouting`)
-- `✅` slim 委托式路由(`MqttApplicationMessageDispatcher` + `AddMqttApplicationMessageSlimRouting`,基于 `JsonTypeInfo<T>`,dispatch 路径零反射)
-- `✅` 显式 controller type 注册方向
+R6已有source generator v1及明确的反射式/slim入口，但性能、完整trimming与真实NativeAOT消费仍分别待验。保留旧入口的兼容职责，不把两种入口存在本身当成需要重写的缺陷；也不由JsonTypeInfo或生成器存在推断全部动态路径已支持AOT。
 
-### 两套路由并存的现状
-
-当前仓库同时存在两套独立实现,能力不重叠也没有明确分工:
-
-| | 反射式 | slim 委托式 |
-| --- | --- | --- |
-| 入口 | `WithAttributeRouting` 挂 broker 拦截器 | `IMqttApplicationMessageDispatcher.DispatchAsync` |
-| 编程模型 | controller/action + attribute | route 模板 + 委托 handler |
-| 绑定 | 运行时反射 | 编译期 `JsonTypeInfo<T>` |
-| AOT | 需要硬化 | 天然友好 |
-| result/filter | 靠 `MqttBaseController` | 无 |
-
-**这是本路线图当前最大的未决问题**:R1 之后要在哪一套上生长?两套都补 = 重复造轮子;slim 已经具备的 delegate/AOT 优势,不应在反射路径上再实现一遍。收敛策略在 R0 决定(见下文)。
-
-### 缺口
-
-- `⬜` application model 不够显式。
-- `⚠️` binding 存在正确性 bug(Guid/enum 转换、错误模型不统一),不只是"缺功能"。
-- `⬜` result 类型不够表达化。
-- `✅` filter 管线已支持授权、资源、action、异常和 result 扩展点。
-- `⬜` route catalog 和测试辅助不足。
-- `⚠️` 两套路径都有热路径反射和 payload 复制可优化。
-- `??` AOT/trimming 体验需要继续硬化。
+下一份交付是R6的具名支持矩阵、热路径负载/分配与实际AOT消费者，复用现有结果/过滤器/注册模型。证据边界见[生态核查](../../docs/audits/roadmap-audit-20261111/ecosystem.md)，全仓优先级见[根路线](../../ROADMAP.md#当前推进顺序)。本子库只处理通用MQTT编程模型，消费程序的认证/领域语义/数据库恢复仍由宿主负责。
 
 ## 实现顺序总览
 
@@ -147,7 +117,7 @@ MQTT routing 也应保持这个分层:
 | 4 | `✅` | R3 Binding 体系 | MQTT 专用 binding source,替代零散反射绑定 | R2 |
 | 5 | `✅` | R4 Result 体系 | MQTT result 与 return type executor | R2、R3 |
 | 6 | `✅` | R5 Filter 管线 | 授权、资源、action、异常、result 扩展点 | R2、R3、R4 |
-| 7 | `🧪` | R6 性能与 AOT | 缓存热路径、显式注册、trimming 基线 | R1-R5 |
+| 7 | `🟡` | R6 性能与 AOT | 缓存热路径、显式注册、trimming 基线 | R1-R5 |
 | 8 | `✅` | R7 开发者体验 | 文档、示例、测试辅助、API approval | R1-R6 |
 
 执行原则:
