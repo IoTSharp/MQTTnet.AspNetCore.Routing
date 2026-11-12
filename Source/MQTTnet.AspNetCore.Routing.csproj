@@ -12,13 +12,11 @@
 		<PackageTags>MQTT Message Queue Telemetry Transport MQTTClient MQTTServer Server MQTTBroker Broker NETStandard IoT InternetOfThings Messaging Hardware Arduino Sensor Actuator M2M ESP Smart Home Cities Automation Xamarin Blazor AspNetCore</PackageTags>
 		<Company>Atlas Lift Tech Inc;IoTSharp</Company>
 		<Authors>Anton Vishnyak;maikebing</Authors>
-		<AssemblyVersion>0.4.0</AssemblyVersion>
-		<FileVersion>0.4.0</FileVersion>
 		<LangVersion>default</LangVersion>
 		<RepositoryUrl>https://github.com/IoTSharp/MQTTnet.AspNetCore.Routing</RepositoryUrl>
 		<RepositoryType>GIT</RepositoryType>
-		<PackageReleaseNotes>* Added support for passing an array of assemblies to use in route discovery</PackageReleaseNotes>
-		<Version>0.4.0</Version>
+		<PackageReleaseNotes>Align package and assembly versions for the validated 5.3.1 mainline and publish the tested package through a strict tag workflow.</PackageReleaseNotes>
+		<Version>5.3.1</Version>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 		<PackageProjectUrl>https://github.com/IoTSharp/MQTTnet.AspNetCore.Routing</PackageProjectUrl>
 		<PackageReadmeFile>README.md</PackageReadmeFile>

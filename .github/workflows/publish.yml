@@ -1,10 +1,9 @@
 name: Publish
 
 on:
-  release:
-    types:
-      - published
-  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -15,35 +14,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  version:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 5
+    outputs:
+      value: ${{ steps.resolve.outputs.value }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
             8.0.x
             10.0.x
-
-      - name: Restore
-        run: dotnet restore "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln"
-
       - name: Resolve package version
+        id: resolve
         env:
-          RAW_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+          RAW_TAG: ${{ github.ref_name }}
         run: |
-          NUGET_VERSION_PATTERN='^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z-]+)*(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          RELEASE_TAG_PATTERN='^v(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})$'
 
           if [ -z "$RAW_TAG" ]; then
             echo "Release tag or ref name is empty."
             exit 1
           fi
-          if [ "$RAW_TAG" = "v" ]; then
-            echo "Release tag 'v' does not contain a version."
+          if ! [[ "$RAW_TAG" =~ $RELEASE_TAG_PATTERN ]]; then
+            echo "Release tags must use lowercase vMAJOR.MINOR.PATCH without suffixes or leading zeroes."
             exit 1
           fi
           PACKAGE_VERSION="${RAW_TAG#v}"
@@ -51,30 +48,73 @@ jobs:
             echo "Release tag '$RAW_TAG' does not contain a version after the optional 'v' prefix."
             exit 1
           fi
-          # major.minor.patch with optional prerelease/build metadata segments.
-          if ! [[ "$PACKAGE_VERSION" =~ $NUGET_VERSION_PATTERN ]]; then
-            echo "Package version '$PACKAGE_VERSION' derived from '$RAW_TAG' is not a valid NuGet version."
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$PACKAGE_VERSION"
+          if [ "$MAJOR" -gt 65534 ] || [ "$MINOR" -gt 65534 ] || [ "$PATCH" -gt 65534 ]; then
+            echo "Release version components must be at most 65534."
             exit 1
           fi
           echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
+          echo "value=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Restore
+        run: dotnet restore "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln"
 
       - name: Build
-        run: dotnet build "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln" --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
+        run: dotnet build "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln" --configuration Release --no-restore -p:Version="${{ needs.version.outputs.value }}" -p:ContinuousIntegrationBuild=true
 
       - name: Test
         run: dotnet test "${{ github.workspace }}/MQTTnet.AspNetCore.Routing.sln" --configuration Release --no-build
 
       - name: Pack
-        run: dotnet pack "${{ github.workspace }}/Source/MQTTnet.AspNetCore.Routing.csproj" --configuration Release --no-build --output "${{ github.workspace }}/artifacts" -p:Version="$PACKAGE_VERSION"
+        run: dotnet pack "${{ github.workspace }}/Source/MQTTnet.AspNetCore.Routing.csproj" --configuration Release --no-build --output "${{ github.workspace }}/artifacts" -p:Version="${{ needs.version.outputs.value }}" -p:ContinuousIntegrationBuild=true
+
+      - name: Upload tested packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-package
+          path: |
+            ${{ github.workspace }}/artifacts/*.nupkg
+            ${{ github.workspace }}/artifacts/*.snupkg
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [version, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Download tested packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-package
+          path: artifacts
 
       - name: Publish to NuGet.org
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          dotnet nuget push "${{ github.workspace }}/artifacts/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
-          dotnet nuget push "${{ github.workspace }}/artifacts/*.snupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          test -n "$NUGET_API_KEY" || { echo '::error::NUGET_API_KEY is missing'; exit 1; }
+          dotnet nuget push "artifacts/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --timeout 120
+          dotnet nuget push "artifacts/*.snupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --timeout 120
 
       - name: Publish to GitHub Packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet nuget push "${{ github.workspace }}/artifacts/*.nupkg" --api-key "$GITHUB_TOKEN" --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json --skip-duplicate
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "$GITHUB_TOKEN" --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json --skip-duplicate

@@ -74,7 +74,7 @@ This library is available as a nuget package: <https://www.nuget.org/packages/MQ
 Install this package and MQTTnet from nuget.
 For dotnet CLI: 
 ```bash
-dotnet add package MQTTnet.AspNetCore.Routing
+dotnet add package MQTTnet.AspNetCore.Routing --version 5.3.1
 ```
 
 ### Slim routing for Native AOT
