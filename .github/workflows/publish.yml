@@ -111,7 +111,7 @@ jobs:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           test -n "$NUGET_API_KEY" || { echo '::error::NUGET_API_KEY is missing'; exit 1; }
-          dotnet nuget push "artifacts/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --timeout 120
+          dotnet nuget push "artifacts/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --timeout 120 --no-symbols
           dotnet nuget push "artifacts/*.snupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --timeout 120
 
       - name: Publish to GitHub Packages
